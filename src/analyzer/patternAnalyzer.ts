@@ -71,10 +71,17 @@ export class PatternAnalyzer {
    * Atualiza as configurações
    */
   public updateConfiguration(): void {
+    console.log("Updating PatternAnalyzer configuration");
     this.targetJavaVersion = this.getTargetJavaVersion();
     this.rules = this.ruleRegistry.getRulesForTargetVersion(this.targetJavaVersion);
     this.excludedFolders = this.getExcludedFolders();
     this.excludedFiles = this.getExcludedFiles();
+    
+    console.log(`Configuration updated: Java ${this.targetJavaVersion}, ${this.rules.length} active rules`);
+    // Log the active rules
+    this.rules.forEach(rule => {
+      console.log(`  - ${rule.id} (Introduced in Java ${rule.introducedVersion})`);
+    });
   }
   
   /**
@@ -210,5 +217,112 @@ export class PatternAnalyzer {
     }
     
     return allMatches;
+  }
+
+  /**
+   * Analisa caminhos específicos selecionados pelo usuário
+   * @param selectedPaths Caminhos selecionados para análise
+   * @param progressCallback Callback para atualizar o progresso
+   */
+  public async analyzeSelectedPaths(
+    selectedPaths: string[],
+    progressCallback?: (message: string, increment: number) => void
+  ): Promise<AnalysisResults> {
+    console.log(`Analyzing ${selectedPaths.length} selected paths`);
+    
+    // Encontrar todos os arquivos Java nos caminhos selecionados
+    const javaFiles: vscode.Uri[] = [];
+    
+    for (const selectedPath of selectedPaths) {
+      try {
+        const pathUri = vscode.Uri.file(selectedPath);
+        const stat = await vscode.workspace.fs.stat(pathUri);
+        
+        if (stat.type === vscode.FileType.Directory) {
+          // É uma pasta, encontrar arquivos Java dentro dela
+          const files = await vscode.workspace.findFiles(
+            new vscode.RelativePattern(selectedPath, '**/*.java'),
+            '**/node_modules/**'
+          );
+          javaFiles.push(...files);
+        } else if (stat.type === vscode.FileType.File && selectedPath.endsWith('.java')) {
+          // É um arquivo Java
+          javaFiles.push(pathUri);
+        }
+      } catch (error) {
+        console.error(`Error accessing path ${selectedPath}:`, error);
+      }
+    }
+    
+    // Remover duplicatas
+    const uniqueJavaFiles = Array.from(new Set(javaFiles.map(f => f.toString())))
+      .map(uri => vscode.Uri.parse(uri));
+    
+    console.log(`Found ${uniqueJavaFiles.length} unique Java files in selected paths`);
+    
+    const totalFiles = uniqueJavaFiles.length;
+    let analyzedFiles = 0;
+    let filesWithIssues = 0;
+    const allMatches: PatternMatch[] = [];
+    const statsByPatternType = new Map<string, number>();
+    const statsByFile = new Map<string, number>();
+    
+    let totalImpact = {
+      readability: 0,
+      performance: 0,
+      maintenance: 0
+    };
+    
+    for (const file of uniqueJavaFiles) {
+      // Pular arquivos excluídos
+      if (this.isExcluded(file.fsPath)) {
+        continue;
+      }
+      
+      analyzedFiles++;
+      
+      if (progressCallback) {
+        progressCallback(`Analisando ${path.basename(file.fsPath)}`, 1 / totalFiles * 100);
+      }
+      
+      const fileMatches = await this.analyzeFile(file);
+      
+      if (fileMatches.length > 0) {
+        filesWithIssues++;
+        allMatches.push(...fileMatches);
+        statsByFile.set(file.fsPath, fileMatches.length);
+        
+        // Atualizar estatísticas por tipo de padrão e impacto
+        for (const match of fileMatches) {
+          const patternId = match.rule.id;
+          const currentCount = statsByPatternType.get(patternId) || 0;
+          statsByPatternType.set(patternId, currentCount + 1);
+          
+          // Acumular impacto
+          totalImpact.readability += match.rule.impact.readability;
+          totalImpact.performance += match.rule.impact.performance;
+          totalImpact.maintenance += match.rule.impact.maintenance;
+        }
+      }
+    }
+    
+    // Normalizar o impacto
+    const totalPatterns = allMatches.length;
+    if (totalPatterns > 0) {
+      totalImpact.readability /= totalPatterns;
+      totalImpact.performance /= totalPatterns;
+      totalImpact.maintenance /= totalPatterns;
+    }
+    
+    return {
+      matches: allMatches,
+      totalFiles,
+      analyzedFiles,
+      filesWithIssues,
+      totalPatterns,
+      statsByPatternType,
+      statsByFile,
+      impact: totalImpact
+    };
   }
 }

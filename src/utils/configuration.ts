@@ -19,14 +19,15 @@ export class Configuration {
   }
   
   /**
-   * Obtém a versão alvo do Java
+   * Obtém a versão alvo do Java das configurações
    */
-  public getTargetJavaVersion(): number {
+  private getTargetJavaVersion(): number {
     const config = vscode.workspace.getConfiguration('legacyJavaModernizer');
     const version = config.get<string>('targetJavaVersion', '11');
-    return parseInt(version, 10);
+    const parsedVersion = parseInt(version, 10);
+    console.log(`Target Java version from config: ${version} (parsed: ${parsedVersion})`);
+    return parsedVersion;
   }
-  
   /**
    * Define a versão alvo do Java
    * @param version Versão alvo do Java
@@ -45,13 +46,14 @@ export class Configuration {
   }
   
   /**
-   * Obtém as pastas excluídas
+   * Obtém as pastas excluídas das configurações
    */
-  public getExcludedFolders(): string[] {
+  private getExcludedFolders(): string[] {
     const config = vscode.workspace.getConfiguration('legacyJavaModernizer');
-    return config.get<string[]>('excludedFolders', []);
+    const folders = config.get<string[]>('excludedFolders', []);
+    console.log(`Excluded folders from config: ${folders.join(', ') || 'none'}`);
+    return folders;
   }
-  
   /**
    * Adiciona uma pasta à lista de exclusões
    * @param folder Pasta a ser excluída
@@ -81,14 +83,17 @@ export class Configuration {
     }
   }
   
-  /**
-   * Obtém os arquivos excluídos
-   */
-  public getExcludedFiles(): string[] {
-    const config = vscode.workspace.getConfiguration('legacyJavaModernizer');
-    return config.get<string[]>('excludedFiles', []);
-  }
+
   
+  /**
+   * Obtém os arquivos excluídos das configurações
+   */
+  private getExcludedFiles(): string[] {
+    const config = vscode.workspace.getConfiguration('legacyJavaModernizer');
+    const files = config.get<string[]>('excludedFiles', []);
+    console.log(`Excluded files from config: ${files.join(', ') || 'none'}`);
+    return files;
+  }
   /**
    * Adiciona um arquivo à lista de exclusões
    * @param file Arquivo a ser excluído

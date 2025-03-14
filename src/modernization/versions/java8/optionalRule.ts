@@ -169,7 +169,10 @@ export class OptionalRule extends AbstractModernizationRule {
   getModernizedText(document: vscode.TextDocument, range: vscode.Range): string {
     const text = document.getText(range);
     
-    // O import será tratado separadamente na função prepareModernization
+    // Add import automatically
+    this.prepareModernization(document).catch(error => {
+      console.error("Error adding Optional import:", error);
+    });
     
     // Tentar converter verificação com else primeiro
     const withElsePattern = this.getNullCheckWithElsePattern();

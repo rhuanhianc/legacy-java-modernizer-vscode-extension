@@ -11,12 +11,30 @@
         <header class="header">
             <h1>Legacy Java Modernizer</h1>
         </header>
-
+        <section class="explorer-section">
+            <h2>Explorador de Arquivos</h2>
+            <div class="explorer-controls">
+                <button class="action-button" id="refreshExplorerBtn">Atualizar Estrutura</button>
+            </div>
+            <div class="folder-tree" id="folderTree">
+                <!-- Preenchido via JavaScript -->
+                <div class="no-data-message">
+                    Carregando estrutura de pastas...
+                </div>
+            </div>
+            <div class="explorer-actions">
+                <button class="action-button" id="analyzeSelectedBtn">Analisar Selecionados</button>
+            </div>
+        </section>
         <section class="version-section">
             <h2>Versão Alvo</h2>
             <div class="version-selector">
                 <div class="version-label">Seu Código será Modernizado para:</div>
                 <div class="version-tag" id="currentVersion">Java {{targetVersion}}</div>
+                <div class="version-status">
+                    <span class="version-label">Status:</span>
+                    <span id="versionStatus" class="version-value">Ativo</span>
+                </div>
                 <div class="version-info">
                     <p>As regras de modernização disponíveis dependem da versão alvo do Java.</p>
                     <ul class="version-features-list" id="versionFeaturesList">
@@ -147,7 +165,7 @@
     <script>
         // Dados iniciais
         const targetVersion = "{{targetVersion}}";
-        const supportedVersions = {{supportedVersions}};
+        const supportedVersions = JSON.parse('{{{supportedVersions}}}');
     </script>
     <script src="{{jsPath}}"></script>
 </body>

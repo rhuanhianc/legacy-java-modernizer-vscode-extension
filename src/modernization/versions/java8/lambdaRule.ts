@@ -47,14 +47,24 @@ export class LambdaRule extends AbstractModernizationRule {
     // Construir pattern para interfaces funcionais suportadas
     const interfacePattern = LambdaRule.FUNCTIONAL_INTERFACES.join('|');
     
-    // Pattern para detectar:
-    // 1. new InterfaceName()
+    // Padrão mais robusto para detectar:
+    // 1. new InterfaceName<GenericParams>()
     // 2. { sobrescrita de método com possível @Override }
+    // 3. Suporta comentários e formatação variada
     return new RegExp(
-      `new\\s+(${interfacePattern})\\s*\\(\\)\\s*\\{\\s*` +
+      // Interface name with optional generic parameters
+      `new\\s+(${interfacePattern})(?:<[^>]*>)?\\s*\\(\\)\\s*\\{\\s*` +
+      // Optional @Override annotation and method visibility
+      `(?:\\s*(?:\\/\\/[^\\n]*\\n|\\/\\*[\\s\\S]*?\\*\\/)?\\s*)?` +
       `(?:@Override\\s*)?` +
-      `(?:public\\s+)?\\w+\\s+(\\w+)\\s*\\(([^)]*)\\)\\s*\\{` +
-      `([^}]*)\\}\\s*\\}`,
+      `(?:public\\s+)?` +
+      // Return type and method name
+      `(?:\\s*(?:\\/\\/[^\\n]*\\n|\\/\\*[\\s\\S]*?\\*\\/)?\\s*)?` +
+      `\\w+\\s+(\\w+)\\s*\\(([^)]*)\\)\\s*\\{` +
+      // Method body
+      `([\\s\\S]*?)` +
+      // End of method and anonymous class
+      `\\}\\s*\\}`,
       'g'
     );
   }

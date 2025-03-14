@@ -11,9 +11,13 @@ let activator: Activator | undefined;
  * @param context Contexto da extensão
  */
 export function activate(context: vscode.ExtensionContext) {
+    console.log('Ativando extensão "Legacy Java Modernizer"');
+    
     // Criar e ativar a extensão
     activator = new Activator(context);
     activator.activate();
+    
+    console.log('Extensão "Legacy Java Modernizer" ativada com sucesso');
 }
 
 /**

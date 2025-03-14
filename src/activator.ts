@@ -112,6 +112,13 @@ export class Activator {
       ),
 
       vscode.commands.registerCommand(
+        "legacyJavaModernizer.analyzeSelected",
+        () => {
+          this.analyzeSelected();
+        }
+      ),
+
+      vscode.commands.registerCommand(
         "legacyJavaModernizer.showDashboard",
         () => {
           if (this.lastAnalysisResults) {
@@ -278,7 +285,77 @@ Manutenibilidade: ${this.lastAnalysisResults.impact.maintenance.toFixed(1)}/10`,
       this.context.subscriptions.push(command);
     }
   }
-
+ /**
+   * Analisa apenas os caminhos selecionados no explorador
+   */
+ public async analyzeSelected(): Promise<void> {
+  const selectedPaths = this.sidebarProvider.getSelectedPaths();
+  
+  if (selectedPaths.length === 0) {
+    vscode.window.showInformationMessage(
+      "Nenhum item selecionado para análise. Selecione arquivos ou pastas no explorador."
+    );
+    return;
+  }
+  
+  console.log(`Analisando ${selectedPaths.length} caminhos selecionados`);
+  
+  // Atualizar configurações do analisador
+  this.analyzer.updateConfiguration();
+  
+  await vscode.window.withProgress(
+    {
+      location: vscode.ProgressLocation.Notification,
+      title: "Analisando código Java...",
+      cancellable: true,
+    },
+    async (progress, token) => {
+      // Iniciar análise dos caminhos selecionados
+      const results = await this.analyzer.analyzeSelectedPaths(
+        selectedPaths,
+        (message, increment) => {
+          progress.report({ increment, message });
+        }
+      );
+      
+      if (token.isCancellationRequested) {
+        vscode.window.showInformationMessage(
+          "Análise cancelada pelo usuário."
+        );
+        return;
+      }
+      
+      // Armazenar resultados
+      this.lastAnalysisResults = results;
+      
+      // Atualizar diagnósticos
+      this.diagnosticsProvider.updateAllDiagnostics(results.matches);
+      
+      // Limpar cache de CodeLens
+      this.codeLensProvider.clearCache();
+      
+      // Atualizar estatísticas
+      this.statisticsProvider.updateStatistics(results);
+      
+      // Atualizar barra lateral
+      this.sidebarProvider.updateContent(results);
+      
+      // Mostrar resultados
+      vscode.window
+        .showInformationMessage(
+          `Análise concluída. Encontrados ${results.totalPatterns} padrões em ${results.filesWithIssues} arquivos.`,
+          "Mostrar Dashboard"
+        )
+        .then((selection) => {
+          if (selection === "Mostrar Dashboard") {
+            vscode.commands.executeCommand(
+              "legacyJavaModernizer.showDashboard"
+            );
+          }
+        });
+    }
+  );
+}
   /**
    * Registra provedores da extensão
    * @param codeActionProvider Provedor de ações de código
@@ -358,6 +435,7 @@ Manutenibilidade: ${this.lastAnalysisResults.impact.maintenance.toFixed(1)}/10`,
 
     this.context.subscriptions.push(provider);
   }
+
 
   /**
    * Analisa o editor ativo
@@ -541,6 +619,10 @@ Manutenibilidade: ${this.lastAnalysisResults.impact.maintenance.toFixed(1)}/10`,
     const config = vscode.workspace.getConfiguration("legacyJavaModernizer");
     const currentVersion = config.get<string>("targetJavaVersion", "11");
 
+    console.log(
+      `Changing target Java version, current version: ${currentVersion}`
+    );
+
     const options = [
       { label: "Java 8", detail: "Versão LTS" },
       { label: "Java 9", detail: "Versão não-LTS" },
@@ -558,6 +640,7 @@ Manutenibilidade: ${this.lastAnalysisResults.impact.maintenance.toFixed(1)}/10`,
     if (selected) {
       // Extrair o número da versão
       const version = selected.label.replace("Java ", "");
+      console.log(`User selected Java ${version}`);
 
       // Atualizar configuração
       await config.update(
@@ -565,11 +648,13 @@ Manutenibilidade: ${this.lastAnalysisResults.impact.maintenance.toFixed(1)}/10`,
         version,
         vscode.ConfigurationTarget.Workspace
       );
+      console.log(`Configuration updated to Java ${version}`);
 
       // Atualizar configurações do analisador
       this.analyzer.updateConfiguration();
 
       // Atualizar barra lateral
+      console.log(`Updating sidebar for Java ${version}`);
       this.sidebarProvider.updateTargetVersion(parseInt(version));
 
       vscode.window.showInformationMessage(
@@ -577,7 +662,10 @@ Manutenibilidade: ${this.lastAnalysisResults.impact.maintenance.toFixed(1)}/10`,
       );
 
       // Reexecutar análise
+      console.log("Re-analyzing workspace with new Java version");
       this.analyzeWorkspace();
+    } else {
+      console.log("User cancelled version selection");
     }
   }
 }

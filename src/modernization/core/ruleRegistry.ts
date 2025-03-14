@@ -78,21 +78,33 @@ export class RuleRegistry {
   public getRulesForTargetVersion(targetVersion: number): ModernizationRule[] {
     const rules: ModernizationRule[] = [];
     
+    console.log(`Getting rules for target Java version: ${targetVersion}`);
+    
     // Adicionar todas as regras até a versão alvo
     for (const [version, versionRules] of this.rulesByVersion.entries()) {
       if (version <= targetVersion) {
+        console.log(`Including rules from Java ${version}, found ${versionRules.length} rules`);
+        
         for (const rule of versionRules) {
           // Verificar se a regra já foi adicionada
           if (!rules.some(r => r.id === rule.id)) {
             // Verificar se a regra está habilitada
             if (rule.isEnabled()) {
+              console.log(`  - Adding rule: ${rule.id} (${rule.name})`);
               rules.push(rule);
+            } else {
+              console.log(`  - Skipping disabled rule: ${rule.id} (${rule.name})`);
             }
+          } else {
+            console.log(`  - Skipping duplicate rule: ${rule.id} (${rule.name})`);
           }
         }
+      } else {
+        console.log(`Skipping rules from Java ${version} (> target version ${targetVersion})`);
       }
     }
     
+    console.log(`Found ${rules.length} rules applicable for Java ${targetVersion}`);
     return rules;
   }
 

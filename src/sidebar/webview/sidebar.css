@@ -77,6 +77,18 @@ section:last-child {
   color: var(--text-secondary);
 }
 
+.version-status {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 5px;
+}
+
+.version-value {
+  font-weight: 500;
+  color: var(--success-color);
+}
+
 .version-tag {
   display: inline-block;
   background-color: var(--primary-color);
@@ -97,6 +109,7 @@ section:last-child {
   cursor: pointer;
   font-size: 12px;
   align-self: flex-start;
+  margin-top: 8px;
 }
 
 .change-version-btn:hover {
@@ -356,74 +369,80 @@ section:last-child {
   margin-top: 2px;
   color: var(--text-secondary);
 }
-.version-section {
-  padding: 10px 0;
+
+/* Explorador (Tree View) */
+.explorer-section {
   margin-bottom: 15px;
 }
 
-.version-selector {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.version-label {
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
-.version-tag {
-  display: inline-block;
-  background-color: var(--primary-color);
-  color: white;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-weight: 500;
-  font-size: 14px;
-  align-self: flex-start;
-}
-
-.version-info {
+.folder-tree {
   margin-top: 10px;
-  font-size: 12px;
-  color: var(--text-secondary);
-  background-color: var(--card-background);
+  max-height: 300px;
+  overflow-y: auto;
   border: 1px solid var(--border-color);
   border-radius: 4px;
-  padding: 8px;
+  padding: 5px;
 }
 
-.version-features-list {
-  margin-top: 8px;
-  padding-left: 20px;
+.tree-item {
+  padding: 2px 0;
 }
 
-.version-features-list li {
-  margin-bottom: 4px;
-}
-
-.version-feature-badge {
-  display: inline-block;
-  background-color: var(--secondary-color);
-  color: white;
-  font-size: 10px;
-  padding: 2px 4px;
-  border-radius: 3px;
-  margin-right: 4px;
-}
-
-.change-version-btn {
-  background: none;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  padding: 4px 8px;
-  color: var(--text-color);
+.tree-item-content {
+  display: flex;
+  align-items: center;
+  padding: 2px 0;
   cursor: pointer;
-  font-size: 12px;
-  align-self: flex-start;
-  margin-top: 8px;
 }
 
-.change-version-btn:hover {
+.tree-item-content:hover {
   background-color: var(--hover-background);
+}
+
+.tree-item-icon {
+  margin-right: 5px;
+  font-size: 12px;
+  width: 16px;
+  text-align: center;
+}
+
+.tree-item-checkbox {
+  margin-right: 5px;
+}
+
+.tree-item-label {
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tree-children {
+  margin-left: 16px;
+}
+
+.folder-expanded .tree-item-icon:before {
+  content: "▼";
+  font-size: 8px;
+}
+
+.folder-collapsed .tree-item-icon:before {
+  content: "►";
+  font-size: 8px;
+}
+
+.file-item .tree-item-icon:before {
+  content: "📄";
+  font-size: 12px;
+}
+
+.no-data-message {
+  color: var(--text-secondary);
+  font-style: italic;
+  text-align: center;
+  padding: 15px;
+  background-color: var(--card-background);
+  border: 1px dashed var(--border-color);
+  border-radius: 4px;
+  margin: 10px 0;
 }

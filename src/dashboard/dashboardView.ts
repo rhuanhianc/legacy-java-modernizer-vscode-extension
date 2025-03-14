@@ -89,6 +89,25 @@ export class DashboardView {
       result.statsByFile = Object.fromEntries(data.statsByFile);
     }
     
+    // Se matches contém objetos complexos, simplificá-los também
+    if (Array.isArray(data.matches)) {
+      result.matches = data.matches.map(match => ({
+        ...match,
+        // Simplificar objeto rule
+        rule: {
+          id: match.rule.id,
+          name: match.rule.name,
+          description: match.rule.description,
+          introducedVersion: match.rule.introducedVersion,
+          appliesTo: match.rule.appliesTo,
+          complexity: match.rule.complexity,
+          impact: match.rule.impact
+        },
+        // Garantir que o URI do arquivo seja uma string
+        file: match.file.toString()
+      }));
+    }
+    
     return result;
   }
   
@@ -127,19 +146,34 @@ export class DashboardView {
     
     // Log para depuração
     console.log('Dashboard created with analysis results:', 
-      JSON.stringify(this.makeDataSerializable(data), null, 2));
+      JSON.stringify(this.makeDataSerializable(data), null, 2).substring(0, 1000) + '...');
     
     // Manipular mensagens do webview
     this.panel.webview.onDidReceiveMessage(
       message => {
-        console.log('Message received from webview:', message);
+        console.log('Message received from dashboard webview:', message);
+        
         switch (message.command) {
           case 'applyAllRefactorings':
+            console.log('Executing applyAllSuggestions command');
             vscode.commands.executeCommand('legacyJavaModernizer.applyAllSuggestions');
             break;
+            
+          case 'analyzeWorkspace':
+            console.log('Executing analyzeWorkspace command');
+            vscode.commands.executeCommand('legacyJavaModernizer.analyzeWorkspace');
+            break;
+            
           case 'openFile':
+            console.log('Opening file:', message.fileUri);
             vscode.commands.executeCommand('vscode.open', vscode.Uri.parse(message.fileUri));
             break;
+            
+          case 'modernizeFile':
+            console.log('Modernizing file:', message.fileUri);
+            vscode.commands.executeCommand('legacyJavaModernizer.modernizeFile', vscode.Uri.parse(message.fileUri));
+            break;
+            
           case 'log':
             console.log('Dashboard log:', message.data);
             break;
@@ -168,16 +202,17 @@ export class DashboardView {
       return;
     }
     
+    console.log('Updating dashboard with new analysis results');
     this.lastAnalysisResults = data;
+    
+    // Converter dados para formato serializável
+    const serializedData = this.makeDataSerializable(data);
     
     // Enviar dados atualizados para o webview
     this.panel.webview.postMessage({
       command: 'updateData',
-      data: this.makeDataSerializable(data)
+      data: serializedData
     });
-    
-    // Log para depuração
-    console.log('Dashboard updated with new analysis results');
   }
   
   /**

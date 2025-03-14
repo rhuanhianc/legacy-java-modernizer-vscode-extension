@@ -166,11 +166,20 @@ export class SwitchExpressionRule extends AbstractModernizationRule {
     pattern.lastIndex = 0;
     
     return text.replace(pattern, (match, type, varName, switchVar, body) => {
+      console.log(`Converting assignment switch for variable '${varName}' of type '${type}'`);
+      
       // Extrair casos do switch
       const switchCases: Array<{ labels: string[], value: string }> = [];
-      const lines = body.split('\n');
+      
+      // Pré-processar o corpo para remover comentários e normalizar espaços
+      const cleanBody = body
+        .replace(/\/\/[^\n]*/g, '') // Remover comentários de linha
+        .replace(/\/\*[\s\S]*?\*\//g, ''); // Remover comentários de bloco
+      
+      const lines = cleanBody.split('\n');
       let currentLabels: string[] = [];
       let currentValue = '';
+      let inCaseBlock = false;
       
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i].trim();
@@ -185,6 +194,7 @@ export class SwitchExpressionRule extends AbstractModernizationRule {
         if (caseMatch) {
           // Se já temos etiquetas e valor, adicionar o caso atual
           if (currentLabels.length > 0 && currentValue !== '') {
+            console.log(`  Adding case with labels: [${currentLabels.join(', ')}], value: ${currentValue}`);
             switchCases.push({
               labels: [...currentLabels],
               value: currentValue
@@ -194,7 +204,10 @@ export class SwitchExpressionRule extends AbstractModernizationRule {
           }
           
           // Guardar o label atual
-          currentLabels.push(caseMatch[1].trim());
+          const label = caseMatch[1].trim();
+          console.log(`  Found case label: ${label}`);
+          currentLabels.push(label);
+          inCaseBlock = true;
           continue;
         }
         
@@ -203,6 +216,7 @@ export class SwitchExpressionRule extends AbstractModernizationRule {
         if (defaultMatch) {
           // Se já temos etiquetas e valor, adicionar o caso atual
           if (currentLabels.length > 0 && currentValue !== '') {
+            console.log(`  Adding case with labels: [${currentLabels.join(', ')}], value: ${currentValue}`);
             switchCases.push({
               labels: [...currentLabels],
               value: currentValue
@@ -211,19 +225,44 @@ export class SwitchExpressionRule extends AbstractModernizationRule {
             currentValue = '';
           }
           
+          console.log(`  Found default case`);
           currentLabels = ['default'];
+          inCaseBlock = true;
           continue;
         }
         
         // Captura de atribuição
         const assignMatch = line.match(/(\w+)\s*=\s*([^;]+);/);
-        if (assignMatch && assignMatch[1] === varName) {
+        if (assignMatch && assignMatch[1] === varName && inCaseBlock) {
           currentValue = assignMatch[2].trim();
+          console.log(`  Found assignment: ${varName} = ${currentValue}`);
           
           // Se a próxima linha for break ou fim do switch, adicionar o caso
-          const nextLine = i + 1 < lines.length ? lines[i + 1].trim() : '';
-          if (nextLine === 'break;' || nextLine === '}' || nextLine === '' || nextLine.startsWith('case') || nextLine.startsWith('default')) {
-            i += nextLine === 'break;' ? 1 : 0; // Pular a linha de break
+          let j = i + 1;
+          let nextNonEmptyLine = '';
+          
+          // Procurar a próxima linha não vazia
+          while (j < lines.length) {
+            const nextLine = lines[j].trim();
+            if (nextLine !== '') {
+              nextNonEmptyLine = nextLine;
+              break;
+            }
+            j++;
+          }
+          
+          // Se a próxima linha não vazia for um break ou outro caso, adicionar o caso atual
+          if (nextNonEmptyLine === 'break;' || 
+              nextNonEmptyLine === '}' || 
+              nextNonEmptyLine.startsWith('case') || 
+              nextNonEmptyLine.startsWith('default')) {
+            
+            if (nextNonEmptyLine === 'break;') {
+              i = j; // Pular a linha de break
+            }
+            
+            console.log(`  Case block ends with: ${nextNonEmptyLine}`);
+            console.log(`  Adding case with labels: [${currentLabels.join(', ')}], value: ${currentValue}`);
             
             switchCases.push({
               labels: [...currentLabels],
@@ -231,16 +270,24 @@ export class SwitchExpressionRule extends AbstractModernizationRule {
             });
             currentLabels = [];
             currentValue = '';
+            inCaseBlock = false;
           }
         }
       }
       
       // Adicionar o último caso se houver
       if (currentLabels.length > 0 && currentValue !== '') {
+        console.log(`  Adding final case with labels: [${currentLabels.join(', ')}], value: ${currentValue}`);
         switchCases.push({
           labels: [...currentLabels],
           value: currentValue
         });
+      }
+      
+      // Verificar se temos pelo menos um caso
+      if (switchCases.length === 0) {
+        console.log(`  No valid cases found, returning original text`);
+        return match;
       }
       
       // Construir a expressão switch
@@ -256,6 +303,7 @@ export class SwitchExpressionRule extends AbstractModernizationRule {
       
       result += '};';
       
+      console.log(`  Converted to switch expression`);
       return result;
     });
   }

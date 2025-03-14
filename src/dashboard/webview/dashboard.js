@@ -24,7 +24,8 @@ let state = {
             performance: 0,
             maintenance: 0
         }
-    }
+    },
+    lastAnalysisDate: new Date().toISOString()
 };
 
 // Tentar armazenar estado inicial
@@ -63,11 +64,32 @@ document.addEventListener('DOMContentLoaded', () => {
  */
 function setupEventListeners() {
     // Botão de aplicar todas as sugestões
-    document.getElementById('applyAllBtn').addEventListener('click', () => {
-        vscode.postMessage({
-            command: 'applyAllRefactorings'
+    const applyAllBtn = document.getElementById('applyAllButton');
+    if (applyAllBtn) {
+        log("Found applyAllButton, setting up listener");
+        applyAllBtn.addEventListener('click', () => {
+            log("Apply all button clicked");
+            vscode.postMessage({
+                command: 'applyAllRefactorings'
+            });
         });
-    });
+    } else {
+        log("Warning: applyAllButton not found in DOM");
+    }
+    
+    // Botão de atualizar
+    const refreshButton = document.getElementById('refreshButton');
+    if (refreshButton) {
+        log("Found refreshButton, setting up listener");
+        refreshButton.addEventListener('click', () => {
+            log("Refresh button clicked");
+            vscode.postMessage({
+                command: 'analyzeWorkspace'
+            });
+        });
+    } else {
+        log("Warning: refreshButton not found in DOM");
+    }
     
     // Filtro de padrões
     const patternFilter = document.getElementById('patternFilter');
@@ -95,15 +117,20 @@ function setupEventListeners() {
         });
     }
     
+    // Configurar botões de arquivo dinâmicos
+    setupFilesTableEventListeners();
+    
     // Escutar mensagens do VSCode
     window.addEventListener('message', event => {
         const message = event.data;
+        log("Received message: " + message.command);
         
         switch (message.command) {
             case 'updateData':
                 log("Received updateData message");
                 // Atualizar dados e UI
                 state.analysisData = message.data;
+                state.lastAnalysisDate = new Date().toISOString();
                 try {
                     vscode.setState(state);
                     log("Estado atualizado após mensagem updateData");
@@ -114,6 +141,45 @@ function setupEventListeners() {
                 break;
         }
     });
+}
+
+/**
+ * Configurar listeners para botões na tabela de arquivos
+ */
+function setupFilesTableEventListeners() {
+    log("Setting up files table event listeners");
+    const filesTableBody = document.getElementById('filesTableBody');
+    
+    if (filesTableBody) {
+        filesTableBody.addEventListener('click', (e) => {
+            // Verificar se clicou em um botão
+            if (e.target.classList.contains('file-action')) {
+                const button = e.target;
+                const fileUri = button.dataset.fileUri;
+                
+                if (!fileUri) {
+                    log("Error: Button clicked but no fileUri found");
+                    return;
+                }
+                
+                log("File action clicked for: " + fileUri);
+                
+                if (button.textContent === 'Abrir') {
+                    vscode.postMessage({
+                        command: 'openFile',
+                        fileUri: fileUri
+                    });
+                } else if (button.textContent === 'Modernizar') {
+                    vscode.postMessage({
+                        command: 'modernizeFile',
+                        fileUri: fileUri
+                    });
+                }
+            }
+        });
+    } else {
+        log("Warning: filesTableBody not found in DOM");
+    }
 }
 
 /**
@@ -148,6 +214,8 @@ function updateUI(data) {
  */
 function updateGeneralStats(data) {
     try {
+        log("Updating general stats");
+        
         // Estatísticas de arquivos
         const totalFiles = document.getElementById('totalFiles');
         const filesWithPatterns = document.getElementById('filesWithPatterns');
@@ -182,6 +250,8 @@ function updateImpactMeters(impact) {
     }
     
     try {
+        log("Updating impact meters");
+        
         const readabilityMeter = document.getElementById('readabilityMeter');
         const performanceMeter = document.getElementById('performanceMeter');
         const maintenanceMeter = document.getElementById('maintenanceMeter');
@@ -191,9 +261,9 @@ function updateImpactMeters(impact) {
         const maintenanceValue = document.getElementById('maintenanceValue');
         
         // Definir valores
-        if (readabilityMeter) readabilityMeter.value = impact.readability || 0;
-        if (performanceMeter) performanceMeter.value = impact.performance || 0;
-        if (maintenanceMeter) maintenanceMeter.value = impact.maintenance || 0;
+        if (readabilityMeter) readabilityMeter.style.width = `${(impact.readability || 0) * 10}%`;
+        if (performanceMeter) performanceMeter.style.width = `${(impact.performance || 0) * 10}%`;
+        if (maintenanceMeter) maintenanceMeter.style.width = `${(impact.maintenance || 0) * 10}%`;
         
         // Atualizar rótulos
         if (readabilityValue) readabilityValue.textContent = `${(impact.readability || 0).toFixed(1)}/10`;
@@ -209,6 +279,8 @@ function updateImpactMeters(impact) {
  */
 function updateCharts(data) {
     try {
+        log("Updating charts");
+        
         if (!data) {
             log("Dados não disponíveis para gráficos");
             return;
@@ -381,6 +453,8 @@ function updateCharts(data) {
  */
 function updatePatternsTable(data) {
     try {
+        log("Updating patterns table");
+        
         const tableBody = document.getElementById('patternsTableBody');
         if (!tableBody) {
             log("Tabela de padrões não encontrada");
@@ -455,6 +529,8 @@ function updatePatternsTable(data) {
  */
 function updateFilesTable(data) {
     try {
+        log("Updating files table");
+        
         const tableBody = document.getElementById('filesTableBody');
         if (!tableBody) {
             log("Tabela de arquivos não encontrada");
@@ -478,6 +554,8 @@ function updateFilesTable(data) {
         
         // Ordenar por contagem (descendente)
         fileEntries.sort((a, b) => b[1] - a[1]);
+        
+        log(`Displaying ${fileEntries.length} files in the table`);
         
         for (const [filePath, count] of fileEntries) {
             // Criar linha da tabela
@@ -504,24 +582,14 @@ function updateFilesTable(data) {
             const modernizeButton = document.createElement('button');
             modernizeButton.textContent = 'Modernizar';
             modernizeButton.className = 'file-action';
-            modernizeButton.addEventListener('click', () => {
-                vscode.postMessage({
-                    command: 'modernizeFile',
-                    fileUri: filePath
-                });
-            });
+            modernizeButton.dataset.fileUri = filePath;
             
             // Botão de abrir
             const openButton = document.createElement('button');
             openButton.textContent = 'Abrir';
             openButton.className = 'file-action';
             openButton.style.marginLeft = '5px';
-            openButton.addEventListener('click', () => {
-                vscode.postMessage({
-                    command: 'openFile',
-                    fileUri: filePath
-                });
-            });
+            openButton.dataset.fileUri = filePath;
             
             actionsCell.appendChild(modernizeButton);
             actionsCell.appendChild(openButton);
@@ -529,6 +597,9 @@ function updateFilesTable(data) {
             
             tableBody.appendChild(row);
         }
+        
+        // Configurar listeners para os botões
+        setupFilesTableEventListeners();
     } catch (e) {
         log("Erro ao atualizar tabela de arquivos: " + e.message);
     }
