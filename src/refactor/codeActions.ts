@@ -1,3 +1,4 @@
+// src/refactor/codeActions.ts
 import * as vscode from 'vscode';
 
 import { RefactoringProvider } from './refactoringProvider';
@@ -16,13 +17,14 @@ export class ModernizationCodeActionProvider implements vscode.CodeActionProvide
   constructor(
     analyzer: PatternAnalyzer,
     refactoringProvider: RefactoringProvider,
-    _diagnosticCollection: vscode.DiagnosticCollection
+    _diagnosticCollection: vscode.DiagnosticCollection,
+    diagnosticsProvider: ModernizationDiagnosticsProvider
   ) {
     this.analyzer = analyzer;
     this.refactoringProvider = refactoringProvider;
     
-    // Initialize the diagnostics provider
-    this.diagnosticsProvider = new ModernizationDiagnosticsProvider(analyzer);
+    // Use the diagnostics provider passed in
+    this.diagnosticsProvider = diagnosticsProvider;
   }
   
   /**
@@ -42,6 +44,7 @@ export class ModernizationCodeActionProvider implements vscode.CodeActionProvide
     }
     
     const actions: vscode.CodeAction[] = [];
+    const processedDiagnostics = new Set<string>(); // Track processed diagnostics to avoid duplicates
     
     // Check if we have modernization-related diagnostics
     const modernizationDiagnostics = context.diagnostics.filter(
@@ -55,6 +58,15 @@ export class ModernizationCodeActionProvider implements vscode.CodeActionProvide
       const match = this.diagnosticsProvider.getMatchFromDiagnostic(diagnostic);
       
       if (match && match.rule) {
+        // Use the diagnostic's code as a unique identifier
+        const diagnosticId = typeof diagnostic.code === 'string' ? diagnostic.code : '';
+        
+        // Skip if we've already processed this diagnostic
+        if (processedDiagnostics.has(diagnosticId)) {
+          continue;
+        }
+        processedDiagnostics.add(diagnosticId);
+        
         console.log(`Creating actions for rule: ${match.rule.id}`);
         
         // Create modernization action
@@ -96,23 +108,41 @@ export class ModernizationCodeActionProvider implements vscode.CodeActionProvide
           arguments: [match]
         };
         actions.push(excludeAction);
-        
-        // Create a combined fix-all action for this rule type
-        const fixRuleTypeAction = new vscode.CodeAction(
-          `Fix all ${match.rule.name} issues in file`,
-          vscode.CodeActionKind.QuickFix
-        );
-        fixRuleTypeAction.diagnostics = modernizationDiagnostics.filter(
-          d => this.diagnosticsProvider.getMatchFromDiagnostic(d)?.rule.id === match.rule.id
-        );
-        fixRuleTypeAction.command = {
-          title: 'Fix All Rule Issues',
-          command: 'legacyJavaModernizer.fixAllRuleIssues',
-          arguments: [match.rule.id, document.uri]
-        };
-        
-        // Only add this action if there are multiple issues of this type
-        if (fixRuleTypeAction.diagnostics.length > 1) {
+      }
+    }
+    
+    // Find unique rule IDs to create "fix all of this type" actions
+    const ruleIds = new Set<string>();
+    for (const diagnostic of modernizationDiagnostics) {
+      const match = this.diagnosticsProvider.getMatchFromDiagnostic(diagnostic);
+      if (match && match.rule) {
+        ruleIds.add(match.rule.id);
+      }
+    }
+    
+    // Add "fix all" actions for each rule type if there are multiple issues
+    for (const ruleId of ruleIds) {
+      const matchesForRule = modernizationDiagnostics.filter(
+        diag => {
+          const match = this.diagnosticsProvider.getMatchFromDiagnostic(diag);
+          return match?.rule.id === ruleId;
+        }
+      );
+      
+      if (matchesForRule.length > 1) {
+        // Get rule name from first match
+        const firstMatch = this.diagnosticsProvider.getMatchFromDiagnostic(matchesForRule[0]);
+        if (firstMatch) {
+          const fixRuleTypeAction = new vscode.CodeAction(
+            `Fix all ${firstMatch.rule.name} issues in file`,
+            vscode.CodeActionKind.QuickFix
+          );
+          fixRuleTypeAction.diagnostics = matchesForRule;
+          fixRuleTypeAction.command = {
+            title: 'Fix All Rule Issues',
+            command: 'legacyJavaModernizer.fixAllRuleIssues',
+            arguments: [ruleId, document.uri]
+          };
           actions.push(fixRuleTypeAction);
         }
       }

@@ -1,10 +1,10 @@
 import * as vscode from "vscode";
 import { Java8Rules } from "./modernization/versions/java8/java8Rules";
 // import { Java9Rules } from './modernization/versions/java9/Java9Rules';
-import { Java11Rules } from './modernization/versions/java11/java11Rules';
+import { Java11Rules } from "./modernization/versions/java11/java11Rules";
 // import { Java15Rules } from './modernization/versions/java15/Java15Rules';
-import { Java17Rules } from './modernization/versions/java17/java17Rules';
-import { Java21Rules } from './modernization/versions/java21/java21Rules';
+import { Java17Rules } from "./modernization/versions/java17/java17Rules";
+import { Java21Rules } from "./modernization/versions/java21/java21Rules";
 import { PatternAnalyzer } from "./analyzer/patternAnalyzer";
 import { RefactoringProvider } from "./refactor/refactoringProvider";
 import { ModernizationCodeActionProvider } from "./refactor/codeActions";
@@ -64,10 +64,10 @@ export class Activator {
     // Registrar regras para cada versão do Java
     Java8Rules.register();
     // Java9Rules.register();
-     Java11Rules.register();
+    Java11Rules.register();
     // Java15Rules.register();
-     Java17Rules.register();
-     Java21Rules.register();
+    Java17Rules.register();
+    Java21Rules.register();
   }
 
   /**
@@ -80,7 +80,8 @@ export class Activator {
     const codeActionProvider = new ModernizationCodeActionProvider(
       this.analyzer,
       this.refactoringProvider,
-      this.diagnosticCollection
+      this.diagnosticCollection,
+      this.diagnosticsProvider
     );
 
     // Registrar comandos
@@ -285,77 +286,77 @@ Manutenibilidade: ${this.lastAnalysisResults.impact.maintenance.toFixed(1)}/10`,
       this.context.subscriptions.push(command);
     }
   }
- /**
+  /**
    * Analisa apenas os caminhos selecionados no explorador
    */
- public async analyzeSelected(): Promise<void> {
-  const selectedPaths = this.sidebarProvider.getSelectedPaths();
-  
-  if (selectedPaths.length === 0) {
-    vscode.window.showInformationMessage(
-      "Nenhum item selecionado para análise. Selecione arquivos ou pastas no explorador."
-    );
-    return;
-  }
-  
-  console.log(`Analisando ${selectedPaths.length} caminhos selecionados`);
-  
-  // Atualizar configurações do analisador
-  this.analyzer.updateConfiguration();
-  
-  await vscode.window.withProgress(
-    {
-      location: vscode.ProgressLocation.Notification,
-      title: "Analisando código Java...",
-      cancellable: true,
-    },
-    async (progress, token) => {
-      // Iniciar análise dos caminhos selecionados
-      const results = await this.analyzer.analyzeSelectedPaths(
-        selectedPaths,
-        (message, increment) => {
-          progress.report({ increment, message });
-        }
+  public async analyzeSelected(): Promise<void> {
+    const selectedPaths = this.sidebarProvider.getSelectedPaths();
+
+    if (selectedPaths.length === 0) {
+      vscode.window.showInformationMessage(
+        "Nenhum item selecionado para análise. Selecione arquivos ou pastas no explorador."
       );
-      
-      if (token.isCancellationRequested) {
-        vscode.window.showInformationMessage(
-          "Análise cancelada pelo usuário."
-        );
-        return;
-      }
-      
-      // Armazenar resultados
-      this.lastAnalysisResults = results;
-      
-      // Atualizar diagnósticos
-      this.diagnosticsProvider.updateAllDiagnostics(results.matches);
-      
-      // Limpar cache de CodeLens
-      this.codeLensProvider.clearCache();
-      
-      // Atualizar estatísticas
-      this.statisticsProvider.updateStatistics(results);
-      
-      // Atualizar barra lateral
-      this.sidebarProvider.updateContent(results);
-      
-      // Mostrar resultados
-      vscode.window
-        .showInformationMessage(
-          `Análise concluída. Encontrados ${results.totalPatterns} padrões em ${results.filesWithIssues} arquivos.`,
-          "Mostrar Dashboard"
-        )
-        .then((selection) => {
-          if (selection === "Mostrar Dashboard") {
-            vscode.commands.executeCommand(
-              "legacyJavaModernizer.showDashboard"
-            );
-          }
-        });
+      return;
     }
-  );
-}
+
+    console.log(`Analisando ${selectedPaths.length} caminhos selecionados`);
+
+    // Atualizar configurações do analisador
+    this.analyzer.updateConfiguration();
+
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: "Analisando código Java...",
+        cancellable: true,
+      },
+      async (progress, token) => {
+        // Iniciar análise dos caminhos selecionados
+        const results = await this.analyzer.analyzeSelectedPaths(
+          selectedPaths,
+          (message, increment) => {
+            progress.report({ increment, message });
+          }
+        );
+
+        if (token.isCancellationRequested) {
+          vscode.window.showInformationMessage(
+            "Análise cancelada pelo usuário."
+          );
+          return;
+        }
+
+        // Armazenar resultados
+        this.lastAnalysisResults = results;
+
+        // Atualizar diagnósticos
+        this.diagnosticsProvider.updateAllDiagnostics(results.matches);
+
+        // Limpar cache de CodeLens
+        this.codeLensProvider.clearCache();
+
+        // Atualizar estatísticas
+        this.statisticsProvider.updateStatistics(results);
+
+        // Atualizar barra lateral
+        this.sidebarProvider.updateContent(results);
+
+        // Mostrar resultados
+        vscode.window
+          .showInformationMessage(
+            `Análise concluída. Encontrados ${results.totalPatterns} padrões em ${results.filesWithIssues} arquivos.`,
+            "Mostrar Dashboard"
+          )
+          .then((selection) => {
+            if (selection === "Mostrar Dashboard") {
+              vscode.commands.executeCommand(
+                "legacyJavaModernizer.showDashboard"
+              );
+            }
+          });
+      }
+    );
+  }
   /**
    * Registra provedores da extensão
    * @param codeActionProvider Provedor de ações de código
@@ -435,7 +436,6 @@ Manutenibilidade: ${this.lastAnalysisResults.impact.maintenance.toFixed(1)}/10`,
 
     this.context.subscriptions.push(provider);
   }
-
 
   /**
    * Analisa o editor ativo

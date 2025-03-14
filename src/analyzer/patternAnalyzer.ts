@@ -32,6 +32,8 @@ export class PatternAnalyzer {
   private excludedFolders: string[];
   private excludedFiles: string[];
   private ruleRegistry: RuleRegistry;
+    isConfigurationLoaded: any;
+    targetVersion: any;
   
   constructor() {
     this.parser = new JavaASTParser();
@@ -192,7 +194,10 @@ export class PatternAnalyzer {
     try {
       console.log(`Analyzing file: ${fileUri.fsPath} with ${this.rules.length} rules`);
       
-      const document = await vscode.workspace.openTextDocument(fileUri);
+      const document = await vscode.workspace.openTextDocument({
+        content: (await vscode.workspace.fs.readFile(fileUri)).toString(),
+        language: 'java'
+      });
       
       for (const rule of this.rules) {
         if (rule.isEnabled()) {

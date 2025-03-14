@@ -160,16 +160,70 @@ export class ModernizationDiagnosticsProvider {
   }
   
   /**
+   * Formata um trecho de código Java com indentação adequada
+   * @param code Código a ser formatado
+   */
+  private formatJavaCode(code: string): string {
+    // Remover espaços em branco extras no início e fim
+    const trimmed = code.trim();
+    
+    // Identificar o nível de indentação
+    const lines = trimmed.split('\n');
+    
+    // Se houver apenas uma linha, retorna formatado
+    if (lines.length <= 1) {
+      return trimmed;
+    }
+    
+    // Encontrar o nível de indentação comum
+    let minIndent = Number.MAX_VALUE;
+    
+    for (const line of lines) {
+      if (line.trim().length === 0) continue; // Ignorar linhas vazias
+      
+      const indent = line.search(/\S|$/);
+      if (indent < minIndent) {
+        minIndent = indent;
+      }
+    }
+    
+    // Remover a indentação comum
+    const formattedLines = lines.map(line => {
+      if (line.trim().length === 0) return '';
+      return line.substring(Math.min(minIndent, line.search(/\S|$/)));
+    });
+    
+    return formattedLines.join('\n');
+  }
+  
+  /**
    * Cria um diagnóstico para uma correspondência
    * @param match Correspondência de padrão
    */
   private createDiagnosticForMatch(match: PatternMatch): vscode.Diagnostic {
+    // Format code with proper indentation
+    const originalCode = this.formatJavaCode(match.matchedText);
+    const modernizedCode = this.formatJavaCode(match.suggestedReplacement);
+    
+    // Create a markdown formatted message with syntax highlighting
+    const message = [
+      `# ${match.rule.name}`,
+      match.rule.description,
+      "",
+      "## Código Original",
+      originalCode,
+      "",
+      "## Código Modernizado",
+      modernizedCode,
+    ].join('\n');
+    
     const diagnostic = new vscode.Diagnostic(
       match.range,
-      `${match.rule.name}: ${match.rule.description}`,
+      message,
       vscode.DiagnosticSeverity.Information
     );
     
+    // Set message as markdown
     diagnostic.source = 'Legacy Java Modernizer';
     
     // Gerar um ID único para este diagnóstico

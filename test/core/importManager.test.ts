@@ -1,6 +1,17 @@
 import * as vscode from 'vscode';
 import { ImportManager, JavaImport } from '../../src/utils/importManager';
 
+// Create a mock for the insert method
+const insertMock = jest.fn();
+
+// Mock the WorkspaceEdit.prototype.insert method
+jest.spyOn(vscode.WorkspaceEdit.prototype, 'insert').mockImplementation(insertMock);
+
+// Reset the mock before each test
+beforeEach(() => {
+  insertMock.mockClear();
+});
+
 describe('ImportManager', () => {
   test('should add import to a document without imports', async () => {
     const javaContent = `package com.example;
@@ -31,11 +42,10 @@ public class Test {
     const edit = await ImportManager.addImport(document, requiredImport);
     
     expect(edit).toBeDefined();
-    expect(edit?.insert).toHaveBeenCalled();
+    expect(insertMock).toHaveBeenCalled();
     
     // Extract the inserted text
-    const insertCall = edit?.insert as jest.Mock;
-    const insertedText = insertCall.mock.calls[0][2];
+    const insertedText = insertMock.mock.calls[0][2];
     
     expect(insertedText).toBe('import java.util.List;\n');
   });
@@ -72,11 +82,10 @@ public class Test {
     const edit = await ImportManager.addImport(document, requiredImport);
     
     expect(edit).toBeDefined();
-    expect(edit?.insert).toHaveBeenCalled();
+    expect(insertMock).toHaveBeenCalled();
     
     // Verify insertion position is after the last import
-    const insertCall = edit?.insert as jest.Mock;
-    const insertedText = insertCall.mock.calls[0][2];
+    const insertedText = insertMock.mock.calls[0][2];
     
     expect(insertedText).toBe('import java.util.Set;\n');
   });
@@ -180,11 +189,10 @@ public class Test {
     const edit = await ImportManager.addImport(document, requiredImport);
     
     expect(edit).toBeDefined();
-    expect(edit?.insert).toHaveBeenCalled();
+    expect(insertMock).toHaveBeenCalled();
     
     // Extract the inserted text
-    const insertCall = edit?.insert as jest.Mock;
-    const insertedText = insertCall.mock.calls[0][2];
+    const insertedText = insertMock.mock.calls[0][2];
     
     expect(insertedText).toBe('import static java.util.Arrays.asList;\n');
   });
@@ -228,11 +236,10 @@ public class Test {
     const edit = await ImportManager.addImports(document, requiredImports);
     
     expect(edit).toBeDefined();
-    expect(edit?.insert).toHaveBeenCalled();
+    expect(insertMock).toHaveBeenCalled();
     
     // Extract the inserted text
-    const insertCall = edit?.insert as jest.Mock;
-    const insertedText = insertCall.mock.calls[0][2];
+    const insertedText = insertMock.mock.calls[0][2];
     
     // Check that all imports are included in order
     expect(insertedText).toContain('import java.util.List;\n');
@@ -267,12 +274,11 @@ public class Test {
     const edit = await ImportManager.addImport(document, requiredImport);
     
     expect(edit).toBeDefined();
-    expect(edit?.insert).toHaveBeenCalled();
+    expect(insertMock).toHaveBeenCalled();
     
     // Extract the inserted text and position
-    const insertCall = edit?.insert as jest.Mock;
-    const insertPosition = insertCall.mock.calls[0][1];
-    const insertedText = insertCall.mock.calls[0][2];
+    const insertPosition = insertMock.mock.calls[0][1];
+    const insertedText = insertMock.mock.calls[0][2];
     
     // Should insert at the beginning of the file
     expect(insertPosition.line).toBe(0);

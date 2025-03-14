@@ -48,10 +48,13 @@ export class LambdaRule extends AbstractModernizationRule {
     const interfacePattern = LambdaRule.FUNCTIONAL_INTERFACES.join('|');
     
     // More robust pattern to detect:
-    // 1. new InterfaceName<GenericParams>()
-    // 2. { method override with possible @Override }
-    // 3. Supports comments and varied formatting
+    // 1. Variable declaration (captured)
+    // 2. new InterfaceName<GenericParams>()
+    // 3. { method override with possible @Override }
+    // 4. Supports comments and varied formatting
     return new RegExp(
+      // Capture the variable declaration part (if any)
+      `((?:\\w+(?:<[^>]*>)?\\s+\\w+\\s*=\\s*))?` +
       // Interface name with optional generic parameters
       `new\\s+(${interfacePattern})(?:<[^>]*>)?\\s*\\(\\)\\s*\\{\\s*` +
       // Optional @Override annotation and method visibility
@@ -84,7 +87,7 @@ export class LambdaRule extends AbstractModernizationRule {
     const text = document.getText(range);
     const pattern = this.getAnonymousClassPattern();
     
-    return text.replace(pattern, (match, _interfaceName, _methodName, parameters, body) => {
+    return text.replace(pattern, (match, declaration, _interfaceName, _methodName, parameters, body) => {
       // Remove comments, extra whitespace and line breaks from the body
       const cleanBody = body.trim()
         .replace(/\/\/[^\n]*/g, '') // Remove line comments
@@ -151,9 +154,14 @@ export class LambdaRule extends AbstractModernizationRule {
         lambdaExpression += ';';
       }
       
-      // Get the prefix (everything before "new Interface()...")
-      const prefixMatch = match.match(/^(.*?)new\s+/);
-      const prefix = prefixMatch ? prefixMatch[1] : '';
+      // Handle the declaration part
+      let prefix = declaration || '';
+      
+      // If no declaration was captured but there is a variable assignment pattern before 'new'
+      if (!declaration) {
+        const prefixMatch = match.match(/^(.*?)new\s+/);
+        prefix = prefixMatch ? prefixMatch[1] : '';
+      }
       
       return `${prefix}${lambdaExpression}`;
     });
