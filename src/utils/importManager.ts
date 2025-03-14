@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 
 /**
- * Interface para um import a ser adicionado
+ * Interface for an import to be added
  */
 export interface JavaImport {
     packageName: string;
@@ -10,31 +10,31 @@ export interface JavaImport {
 }
 
 /**
- * Gerenciador de imports para arquivos Java
+ * Manager for imports in Java files
  */
 export class ImportManager {
     /**
-     * Adiciona um import a um documento Java
-     * @param document Documento Java
-     * @param requiredImport Import a ser adicionado
-     * @returns Um WorkspaceEdit com a modificação ou undefined se o import já existir
+     * Adds an import to a Java document
+     * @param document Java document
+     * @param requiredImport Import to be added
+     * @returns A WorkspaceEdit with the modification or undefined if the import already exists
      */
     public static async addImport(document: vscode.TextDocument, requiredImport: JavaImport): Promise<vscode.WorkspaceEdit | undefined> {
-        // Verificar se o import já existe
+        // Check if import already exists
         if (this.importExists(document, requiredImport)) {
             return undefined;
         }
 
-        // Encontrar o local para adicionar o import
+        // Find the position to add the import
         const position = this.findImportInsertPosition(document);
         if (!position) {
             return undefined;
         }
 
-        // Construir a declaração de import
+        // Build the import statement
         const importStatement = this.buildImportStatement(requiredImport);
         
-        // Criar a edição
+        // Create the edit
         const edit = new vscode.WorkspaceEdit();
         edit.insert(document.uri, position, importStatement);
         
@@ -42,53 +42,53 @@ export class ImportManager {
     }
 
     /**
-     * Adiciona múltiplos imports a um documento Java
-     * @param document Documento Java
-     * @param imports Lista de imports a serem adicionados
-     * @returns Um WorkspaceEdit com as modificações
+     * Adds multiple imports to a Java document
+     * @param document Java document
+     * @param imports List of imports to be added
+     * @returns A WorkspaceEdit with the modifications
      */
     public static async addImports(document: vscode.TextDocument, imports: JavaImport[]): Promise<vscode.WorkspaceEdit> {
         const edit = new vscode.WorkspaceEdit();
         
-        // Filtrar imports que já existem
+        // Filter imports that already exist
         const newImports = imports.filter(imp => !this.importExists(document, imp));
         
         if (newImports.length === 0) {
             return edit;
         }
         
-        // Encontrar o local para adicionar os imports
+        // Find the position to add the imports
         const position = this.findImportInsertPosition(document);
         if (!position) {
             return edit;
         }
         
-        // Construir as declarações de import
+        // Build the import statements
         const importStatements = newImports.map(imp => this.buildImportStatement(imp)).join('');
         
-        // Adicionar à edição
+        // Add to the edit
         edit.insert(document.uri, position, importStatements);
         
         return edit;
     }
 
     /**
-     * Verifica se um import já existe no documento
-     * @param document Documento Java
-     * @param requiredImport Import a verificar
+     * Checks if an import already exists in the document
+     * @param document Java document
+     * @param requiredImport Import to check
      */
     private static importExists(document: vscode.TextDocument, requiredImport: JavaImport): boolean {
         const importText = document.getText();
         
-        // Criar um padrão regex para encontrar o import
+        // Create a regex pattern to find the import
         let pattern: RegExp;
         
         if (requiredImport.isStatic) {
-            // Import estático (ex: import static java.util.Arrays.asList;)
+            // Static import (ex: import static java.util.Arrays.asList;)
             pattern = new RegExp(`import\\s+static\\s+${requiredImport.packageName}\\.${requiredImport.className}\\s*;`, 'gm');
         } else {
-            // Import normal (ex: import java.util.List;)
-            // Verificar tanto o import específico quanto o import com wildcard
+            // Normal import (ex: import java.util.List;)
+            // Check both specific import and wildcard import
             const specificPattern = new RegExp(`import\\s+${requiredImport.packageName}\\.${requiredImport.className}\\s*;`, 'gm');
             const wildcardPattern = new RegExp(`import\\s+${requiredImport.packageName}\\.\\*\\s*;`, 'gm');
             
@@ -99,13 +99,13 @@ export class ImportManager {
     }
 
     /**
-     * Encontra a posição onde o import deve ser inserido
-     * @param document Documento Java
+     * Finds the position where the import should be inserted
+     * @param document Java document
      */
-    private static findImportInsertPosition(document: vscode.TextDocument): vscode.Position | undefined {
+    private static findImportInsertPosition(document: vscode.TextDocument): vscode.Position {
         const text = document.getText();
         
-        // Tentar encontrar o último import existente
+        // Try to find the last existing import
         const importRegex = /^import\s+(?:static\s+)?[\w.]+\s*;/gm;
         let lastImportMatch: RegExpExecArray | null = null;
         let match: RegExpExecArray | null;
@@ -115,25 +115,29 @@ export class ImportManager {
         }
         
         if (lastImportMatch) {
-            // Posicionar após o último import
+            // Position after the last import
             const offset = lastImportMatch.index + lastImportMatch[0].length;
-            return document.positionAt(offset).with({ character: 0 }).translate(1, 0);
+            const pos = document.positionAt(offset);
+            // Create a new position for the next line
+            return new vscode.Position(pos.line + 1, 0);
         }
         
-        // Se não houver imports, procurar pelo fim da declaração do pacote
+        // If no imports, look for the end of the package declaration
         const packageMatch = /^package\s+[\w.]+\s*;/m.exec(text);
         if (packageMatch) {
             const offset = packageMatch.index + packageMatch[0].length;
-            return document.positionAt(offset).with({ character: 0 }).translate(1, 0);
+            const pos = document.positionAt(offset);
+            // Create a new position for the next line
+            return new vscode.Position(pos.line + 1, 0);
         }
         
-        // Se não houver pacote, inserir no início do arquivo
+        // If no package, insert at the beginning of the file
         return new vscode.Position(0, 0);
     }
 
     /**
-     * Constrói uma declaração de import completa
-     * @param javaImport Import a ser construído
+     * Builds a complete import statement
+     * @param javaImport Import to be built
      */
     private static buildImportStatement(javaImport: JavaImport): string {
         if (javaImport.isStatic) {

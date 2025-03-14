@@ -3,9 +3,10 @@ import * as vscode from 'vscode';
 import { RefactoringProvider } from './refactoringProvider';
 import { PatternAnalyzer } from '../analyzer/patternAnalyzer';
 import { ModernizationDiagnosticsProvider } from '../features/diagnosticsProvider';
+import { ImportManager } from '../utils/importManager';
 
 /**
- * Provedor de ações de código para a extensão
+ * Provider for code actions for the extension
  */
 export class ModernizationCodeActionProvider implements vscode.CodeActionProvider {
   private analyzer: PatternAnalyzer;
@@ -20,102 +21,222 @@ export class ModernizationCodeActionProvider implements vscode.CodeActionProvide
     this.analyzer = analyzer;
     this.refactoringProvider = refactoringProvider;
     
-    // Inicializar o provedor de diagnósticos
+    // Initialize the diagnostics provider
     this.diagnosticsProvider = new ModernizationDiagnosticsProvider(analyzer);
   }
   
   /**
-   * Fornece ações de código para o contexto atual
-   * @param document Documento atual
-   * @param _range Intervalo selecionado
-   * @param context Contexto da ação de código
+   * Provides code actions for the current context
+   * @param document Current document
+   * @param _range Selected range
+   * @param context Code action context
    */
   public async provideCodeActions(
     document: vscode.TextDocument,
     _range: vscode.Range | vscode.Selection,
     context: vscode.CodeActionContext
   ): Promise<vscode.CodeAction[] | undefined> {
-    // Só fornecer ações para documentos Java
+    // Only provide actions for Java documents
     if (document.languageId !== 'java') {
       return;
     }
     
     const actions: vscode.CodeAction[] = [];
     
-    // Verificar se temos diagnósticos relacionados à modernização
+    // Check if we have modernization-related diagnostics
     const modernizationDiagnostics = context.diagnostics.filter(
       diag => diag.source === 'Legacy Java Modernizer'
     );
     
+    console.log(`Found ${modernizationDiagnostics.length} modernization diagnostics`);
+    
     for (const diagnostic of modernizationDiagnostics) {
-      // Recuperar a correspondência usando o diagnosticsProvider
+      // Retrieve the match using the diagnosticsProvider
       const match = this.diagnosticsProvider.getMatchFromDiagnostic(diagnostic);
       
       if (match && match.rule) {
-        // Criar ação de modernização
+        console.log(`Creating actions for rule: ${match.rule.id}`);
+        
+        // Create modernization action
         const modernizeAction = new vscode.CodeAction(
-          `Modernizar: ${match.rule.name}`,
+          `Modernize: ${match.rule.name}`,
           vscode.CodeActionKind.QuickFix
         );
         modernizeAction.diagnostics = [diagnostic];
-        modernizeAction.isPreferred = true; // Marcar como ação preferida
+        modernizeAction.isPreferred = true; // Mark as preferred action
         modernizeAction.command = {
-          title: 'Aplicar Refatoração',
+          title: 'Apply Refactoring',
           command: 'legacyJavaModernizer.applyRefactoring',
           arguments: [match]
         };
         actions.push(modernizeAction);
         
-        // Criar ação para mostrar prévia
+        // Create action to show preview
         const previewAction = new vscode.CodeAction(
-          `Visualizar mudança: ${match.rule.name}`,
+          `Preview change: ${match.rule.name}`,
           vscode.CodeActionKind.QuickFix
         );
         previewAction.diagnostics = [diagnostic];
         previewAction.command = {
-          title: 'Mostrar Prévia da Refatoração',
+          title: 'Show Refactoring Preview',
           command: 'legacyJavaModernizer.showRefactoringPreview',
           arguments: [match]
         };
         actions.push(previewAction);
         
-        // Criar ação para excluir da modernização
+        // Create action to exclude from modernization
         const excludeAction = new vscode.CodeAction(
-          `Excluir esta ocorrência da modernização`,
+          `Exclude this occurrence from modernization`,
           vscode.CodeActionKind.QuickFix
         );
         excludeAction.diagnostics = [diagnostic];
         excludeAction.command = {
-          title: 'Excluir Ocorrência',
+          title: 'Exclude Occurrence',
           command: 'legacyJavaModernizer.excludeOccurrence',
           arguments: [match]
         };
         actions.push(excludeAction);
+        
+        // Create a combined fix-all action for this rule type
+        const fixRuleTypeAction = new vscode.CodeAction(
+          `Fix all ${match.rule.name} issues in file`,
+          vscode.CodeActionKind.QuickFix
+        );
+        fixRuleTypeAction.diagnostics = modernizationDiagnostics.filter(
+          d => this.diagnosticsProvider.getMatchFromDiagnostic(d)?.rule.id === match.rule.id
+        );
+        fixRuleTypeAction.command = {
+          title: 'Fix All Rule Issues',
+          command: 'legacyJavaModernizer.fixAllRuleIssues',
+          arguments: [match.rule.id, document.uri]
+        };
+        
+        // Only add this action if there are multiple issues of this type
+        if (fixRuleTypeAction.diagnostics.length > 1) {
+          actions.push(fixRuleTypeAction);
+        }
       }
     }
     
-    // Adicionar ação para modernizar todo o arquivo se tiver diagnósticos
+    // Add action to modernize the entire file if there are diagnostics
     if (modernizationDiagnostics.length > 0) {
       const modernizeFileAction = new vscode.CodeAction(
-        'Modernizar todo o arquivo',
+        'Modernize entire file',
         vscode.CodeActionKind.RefactorRewrite
       );
       modernizeFileAction.command = {
-        title: 'Modernizar Arquivo',
+        title: 'Modernize File',
         command: 'legacyJavaModernizer.modernizeFile',
         arguments: [document.uri]
       };
       actions.push(modernizeFileAction);
+      
+      // Add action to show modernization summary for the file
+      const summaryAction = new vscode.CodeAction(
+        'Show modernization summary',
+        vscode.CodeActionKind.RefactorRewrite
+      );
+      summaryAction.command = {
+        title: 'Show Modernization Summary',
+        command: 'legacyJavaModernizer.showFileSummary',
+        arguments: [document.uri]
+      };
+      actions.push(summaryAction);
     }
     
     return actions;
   }
   
   /**
-   * Atualiza os diagnósticos para um documento específico
-   * @param document Documento a ser atualizado
+   * Updates diagnostics for a specific document
+   * @param document Document to update
    */
   public async updateDiagnostics(document: vscode.TextDocument): Promise<void> {
     await this.diagnosticsProvider.updateDiagnostics(document);
+  }
+  
+  /**
+   * Fixes all issues of a specific rule type in a file
+   * @param ruleId Rule ID
+   * @param fileUri File URI
+   */
+  public async fixAllRuleIssues(ruleId: string, fileUri: vscode.Uri): Promise<boolean> {
+    console.log(`Fixing all issues of rule type ${ruleId} in file ${fileUri.fsPath}`);
+    
+    try {
+      // Analyze the file to get all matches
+      const allMatches = await this.analyzer.analyzeFile(fileUri);
+      
+      // Filter matches for the specific rule
+      const ruleMatches = allMatches.filter(match => match.rule.id === ruleId);
+      
+      if (ruleMatches.length === 0) {
+        console.log(`No matches found for rule ${ruleId}`);
+        return false;
+      }
+      
+      console.log(`Found ${ruleMatches.length} matches for rule ${ruleId}`);
+      
+      // Apply refactorings for the matched rule
+      const success = await this.refactoringProvider.applyFileRefactorings(fileUri, ruleMatches);
+      
+      return success;
+    } catch (error) {
+      console.error(`Error fixing rule issues: ${error}`);
+      vscode.window.showErrorMessage(`Error fixing ${ruleId} issues: ${error}`);
+      return false;
+    }
+  }
+  
+  /**
+   * Shows a summary of modernization opportunities in a file
+   * @param fileUri File URI
+   */
+  public async showFileSummary(fileUri: vscode.Uri): Promise<void> {
+    console.log(`Showing modernization summary for ${fileUri.fsPath}`);
+    
+    try {
+      // Analyze the file to get all matches
+      const matches = await this.analyzer.analyzeFile(fileUri);
+      
+      if (matches.length === 0) {
+        vscode.window.showInformationMessage('No modernization opportunities found in this file.');
+        return;
+      }
+      
+      // Group matches by rule
+      const matchesByRule = new Map<string, number>();
+      
+      for (const match of matches) {
+        const ruleId = match.rule.id;
+        matchesByRule.set(ruleId, (matchesByRule.get(ruleId) || 0) + 1);
+      }
+      
+      // Build summary message
+      let summaryMessage = `Found ${matches.length} modernization opportunities:\n\n`;
+      
+      matchesByRule.forEach((count, ruleId) => {
+        const rule = matches.find(m => m.rule.id === ruleId)?.rule;
+        if (rule) {
+          summaryMessage += `- ${rule.name}: ${count} occurrences\n`;
+        }
+      });
+      
+      // Show summary
+      vscode.window.showInformationMessage(summaryMessage, 
+        ...[
+          'Modernize All', 
+          'Show in Dashboard'
+        ]).then(selection => {
+          if (selection === 'Modernize All') {
+            vscode.commands.executeCommand('legacyJavaModernizer.modernizeFile', fileUri);
+          } else if (selection === 'Show in Dashboard') {
+            vscode.commands.executeCommand('legacyJavaModernizer.showDashboard');
+          }
+        });
+    } catch (error) {
+      console.error(`Error showing file summary: ${error}`);
+      vscode.window.showErrorMessage(`Error showing modernization summary: ${error}`);
+    }
   }
 }

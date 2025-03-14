@@ -1,48 +1,72 @@
 import * as vscode from 'vscode';
 import { PatternMatch } from '../analyzer/javaASTParser';
 import { PatternAnalyzer } from '../analyzer/patternAnalyzer';
+import { ImportManager, JavaImport } from '../utils/importManager';
 
 /**
- * Provedor de refatorações para modernização de código Java
+ * Provider for refactorings for Java code modernization
  */
 export class RefactoringProvider {
   private analyzer: PatternAnalyzer;
+  edit: any;
   
   constructor(analyzer: PatternAnalyzer) {
     this.analyzer = analyzer;
   }
   
   /**
-   * Aplica uma refatoração específica
-   * @param match Correspondência do padrão a ser refatorado
+   * Applies a specific refactoring
+   * @param match Pattern match to refactor
    */
   public async applyRefactoring(match: PatternMatch): Promise<boolean> {
-    console.log(`Aplicando refatoração: ${match.rule.id}`);
+    console.log(`Applying refactoring: ${match.rule.id}`);
     
     try {
-      // Verificar se o documento ainda existe e está aberto
+      // Check if the document still exists and is open
       const document = await vscode.workspace.openTextDocument(match.file);
       
-      // Verificar se a correspondência ainda é válida
+      // Check if the match is still valid
       const currentText = document.getText(match.range);
       if (currentText !== match.matchedText) {
-        console.log('O texto foi alterado desde a análise, refatoração cancelada');
+        console.log('The text has changed since the analysis, refactoring canceled');
         vscode.window.showWarningMessage(
-          'O texto foi alterado desde a análise. Execute a análise novamente.'
+          'The text has changed since the analysis. Run the analysis again.'
         );
         return false;
       }
       
-      // Aplicar a edição
-      const edit = new vscode.WorkspaceEdit();
-      edit.replace(match.file, match.range, match.suggestedReplacement);
+      // Process the replacement to check if we need to add imports
+      const { replacement, imports } = this.processReplacement(match.suggestedReplacement);
       
-      // Realizar a edição
+      // Create a workspace edit
+      const edit = new vscode.WorkspaceEdit();
+      
+      // Add the replacement
+      edit.replace(match.file, match.range, replacement);
+      
+      // Add imports if needed
+      if (imports.length > 0) {
+        console.log(`Adding ${imports.length} imports for rule ${match.rule.id}`);
+        const importEdit = await ImportManager.addImports(document, imports);
+        
+        // Copy all edits from importEdit to our edit
+        if (importEdit && importEdit.size > 0) {
+          importEdit.entries().forEach(([uri, edits]) => {
+            edits.forEach(edit => {
+              if (edit.newText && edit.range) {
+                this.edit.insert(uri, edit.range.start, edit.newText);
+              }
+            });
+          });
+        }
+      }
+      
+      // Apply the edit
       const success = await vscode.workspace.applyEdit(edit);
       
-      // Analisar o documento novamente para atualizar os diagnósticos
+      // Analyze the document again to update diagnostics
       if (success) {
-        // Esperar um pouco para garantir que o editor foi atualizado
+        // Wait a bit to ensure the editor has updated
         setTimeout(() => {
           const editor = vscode.window.activeTextEditor;
           if (editor && editor.document.uri.fsPath === match.file.fsPath) {
@@ -53,49 +77,108 @@ export class RefactoringProvider {
       
       return success;
     } catch (error) {
-      console.error(`Erro ao aplicar refatoração: ${error}`);
-      vscode.window.showErrorMessage(`Erro ao aplicar refatoração: ${error}`);
+      console.error(`Error applying refactoring: ${error}`);
+      vscode.window.showErrorMessage(`Error applying refactoring: ${error}`);
       return false;
     }
   }
   
   /**
-   * Aplica todas as refatorações em um arquivo
-   * @param fileUri URI do arquivo
-   * @param matches Lista de correspondências a serem aplicadas
+   * Processes a replacement to extract import instructions and clean the actual code
+   * @param replacement The suggested replacement text
+   * @returns The clean replacement and any imports to add
+   */
+  private processReplacement(replacement: string): { replacement: string, imports: JavaImport[] } {
+    const imports: JavaImport[] = [];
+    let cleanReplacement = replacement;
+    
+    // Check for import hints in comments
+    const importRegex = /\/\/\s*Importe:\s*import\s+([\w.]+)\.(\w+)/g;
+    let match;
+    
+    while ((match = importRegex.exec(replacement)) !== null) {
+      const packageName = match[1];
+      const className = match[2];
+      
+      // Add to imports list
+      imports.push({
+        packageName,
+        className
+      });
+      
+      // Remove the import comment from the replacement
+      cleanReplacement = cleanReplacement.replace(match[0], '').trim();
+    }
+    
+    return { replacement: cleanReplacement, imports };
+  }
+  
+  /**
+   * Applies all refactorings in a file
+   * @param fileUri URI of the file
+   * @param matches List of matches to apply
    */
   public async applyFileRefactorings(fileUri: vscode.Uri, matches: PatternMatch[]): Promise<boolean> {
-    console.log(`Aplicando ${matches.length} refatorações no arquivo ${fileUri.fsPath}`);
+    console.log(`Applying ${matches.length} refactorings in file ${fileUri.fsPath}`);
     
     try {
-      // Ordenar as correspondências de trás para frente para evitar problemas com alterações de intervalo
+      // Sort matches from back to front to avoid range issues
       const sortedMatches = [...matches].sort((a, b) => 
         b.range.start.line - a.range.start.line || 
         b.range.start.character - a.range.start.character
       );
       
-      const edit = new vscode.WorkspaceEdit();
-      
-      // Verificar se o documento ainda existe e está aberto
+      // Check if the document still exists and is open
       const document = await vscode.workspace.openTextDocument(fileUri);
       
+      // Create a workspace edit
+      const edit = new vscode.WorkspaceEdit();
+      
+      // Collect all imports needed
+      const allImports: JavaImport[] = [];
+      
+      // Process all matches
       for (const match of sortedMatches) {
-        // Verificar se a correspondência ainda é válida
+        // Check if the match is still valid
         const currentText = document.getText(match.range);
         if (currentText !== match.matchedText) {
-          console.log(`Texto alterado para correspondência ${match.rule.id}, pulando...`);
+          console.log(`Text changed for match ${match.rule.id}, skipping...`);
           continue;
         }
         
-        edit.replace(fileUri, match.range, match.suggestedReplacement);
+        // Process the replacement
+        const { replacement, imports } = this.processReplacement(match.suggestedReplacement);
+        
+        // Add the replacement
+        edit.replace(fileUri, match.range, replacement);
+        
+        // Collect imports
+        allImports.push(...imports);
       }
       
-      // Realizar a edição
+      // Add all needed imports
+      if (allImports.length > 0) {
+        console.log(`Adding ${allImports.length} imports to file`);
+        const importEdit = await ImportManager.addImports(document, allImports);
+        
+        // Copy all edits from importEdit to our edit
+        if (importEdit && importEdit.size > 0) {
+          importEdit.entries().forEach(([uri, edits]) => {
+            edits.forEach(edit => {
+              if (edit.newText && edit.range) {
+                this.edit.insert(uri, edit.range.start, edit.newText);
+              }
+            });
+          });
+        }
+      }
+      
+      // Apply the edit
       const success = await vscode.workspace.applyEdit(edit);
       
-      // Analisar o documento novamente para atualizar os diagnósticos
+      // Analyze the document again to update diagnostics
       if (success) {
-        // Esperar um pouco para garantir que o editor foi atualizado
+        // Wait a bit to ensure the editor has updated
         setTimeout(() => {
           this.analyzer.analyzeFile(fileUri);
         }, 500);
@@ -103,25 +186,25 @@ export class RefactoringProvider {
       
       return success;
     } catch (error) {
-      console.error(`Erro ao aplicar refatorações no arquivo: ${error}`);
-      vscode.window.showErrorMessage(`Erro ao aplicar refatorações: ${error}`);
+      console.error(`Error applying refactorings in file: ${error}`);
+      vscode.window.showErrorMessage(`Error applying refactorings: ${error}`);
       return false;
     }
   }
   
   /**
-   * Aplica todas as refatorações em todos os arquivos analisados
-   * @param matches Lista de correspondências a serem aplicadas
-   * @param progressCallback Callback para atualizar o progresso
+   * Applies all refactorings in all analyzed files
+   * @param matches List of matches to apply
+   * @param progressCallback Callback to update progress
    */
   public async applyAllRefactorings(
     matches: PatternMatch[],
     progressCallback?: (message: string, increment: number) => void
   ): Promise<number> {
-    console.log(`Aplicando ${matches.length} refatorações em todos os arquivos`);
+    console.log(`Applying ${matches.length} refactorings in all files`);
     
     try {
-      // Agrupar correspondências por arquivo
+      // Group matches by file
       const matchesByFile = new Map<string, PatternMatch[]>();
       
       for (const match of matches) {
@@ -141,54 +224,55 @@ export class RefactoringProvider {
         
         if (progressCallback) {
           const fileName = vscode.Uri.parse(fileUri).path.split('/').pop() || 'unknown';
-          progressCallback(`Refatorando ${fileName} (${currentFile}/${totalFiles})`, 1 / totalFiles * 100);
+          progressCallback(`Refactoring ${fileName} (${currentFile}/${totalFiles})`, 1 / totalFiles * 100);
         }
         
         try {
-          // Aplicar refatorações para este arquivo
+          // Apply refactorings for this file
           const success = await this.applyFileRefactorings(vscode.Uri.parse(fileUri), fileMatches);
           
           if (success) {
             appliedCount += fileMatches.length;
           }
         } catch (error) {
-          console.error(`Erro ao refatorar arquivo ${fileUri}: ${error}`);
-          // Continue com o próximo arquivo
+          console.error(`Error refactoring file ${fileUri}: ${error}`);
+          // Continue with the next file
         }
       }
       
       return appliedCount;
     } catch (error) {
-      console.error(`Erro ao aplicar todas as refatorações: ${error}`);
-      vscode.window.showErrorMessage(`Erro ao aplicar todas as refatorações: ${error}`);
+      console.error(`Error applying all refactorings: ${error}`);
+      vscode.window.showErrorMessage(`Error applying all refactorings: ${error}`);
       return 0;
     }
   }
   
   /**
-   * Cria uma prévia da refatoração
-   * @param match Correspondência do padrão
+   * Creates a preview of the refactoring
+   * @param match Pattern match
    */
   public async showRefactoringPreview(match: PatternMatch): Promise<void> {
-    console.log(`Mostrando prévia para refatoração: ${match.rule.id}`);
+    console.log(`Showing preview for refactoring: ${match.rule.id}`);
     
     try {
+      // Process the replacement to remove import hints
+      const { replacement } = this.processReplacement(match.suggestedReplacement);
       const originalText = match.matchedText;
-      const refactoredText = match.suggestedReplacement;
       
-      // Criar um documento de comparação
+      // Create a comparison document
       const previewUri = vscode.Uri.parse(`untitled:refactoring-preview-${match.rule.id}.diff`);
       
-      // Gerar conteúdo diff
+      // Generate diff content
       const diffContent = [
         '--- Original',
-        '+++ Refatoração',
+        '+++ Refactored',
         '@@ -1,1 +1,1 @@',
         '-' + originalText.replace(/\n/g, '\n-'),
-        '+' + refactoredText.replace(/\n/g, '\n+')
+        '+' + replacement.replace(/\n/g, '\n+')
       ].join('\n');
       
-      // Criar ou mostrar o documento
+      // Create or show the document
       try {
         const doc = await vscode.workspace.openTextDocument(previewUri);
         const edit = new vscode.WorkspaceEdit();
@@ -200,7 +284,7 @@ export class RefactoringProvider {
         
         await vscode.workspace.applyEdit(edit);
       } catch (e) {
-        // Se o documento não existir, criar um novo
+        // If the document doesn't exist, create a new one
         const newDoc = await vscode.workspace.openTextDocument({
           content: diffContent,
           language: 'diff'
@@ -213,19 +297,19 @@ export class RefactoringProvider {
         return;
       }
       
-      // Mostrar o documento
+      // Show the document
       await vscode.window.showTextDocument(previewUri, { 
         preview: true, 
         viewColumn: vscode.ViewColumn.Beside 
       });
     } catch (error) {
-      console.error(`Erro ao mostrar prévia: ${error}`);
-      vscode.window.showErrorMessage(`Erro ao mostrar prévia: ${error}`);
+      console.error(`Error showing preview: ${error}`);
+      vscode.window.showErrorMessage(`Error showing preview: ${error}`);
     }
   }
   
   /**
-   * Procura padrões no documento ativo e sugere refatorações
+   * Looks for patterns in the active document and suggests refactorings
    */
   public async suggestRefactorings(): Promise<PatternMatch[]> {
     const activeEditor = vscode.window.activeTextEditor;

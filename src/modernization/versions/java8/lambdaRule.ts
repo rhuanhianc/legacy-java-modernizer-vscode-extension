@@ -3,10 +3,10 @@ import { AbstractModernizationRule } from '../../core/abstractModernizationRule'
 import { RuleComplexity } from '../../core/modernizationRule';
 
 /**
- * Regra para substituir classes anônimas por expressões lambda
+ * Rule to replace anonymous classes with lambda expressions
  */
 export class LambdaRule extends AbstractModernizationRule {
-  // Interfaces funcionais comuns do Java
+  // Common functional interfaces in Java
   private static FUNCTIONAL_INTERFACES = [
     'Runnable',
     'Callable',
@@ -41,16 +41,16 @@ export class LambdaRule extends AbstractModernizationRule {
   }
 
   /**
-   * Padrão para detectar classes anônimas que implementam interfaces funcionais
+   * Pattern to detect anonymous classes implementing functional interfaces
    */
   private getAnonymousClassPattern(): RegExp {
-    // Construir pattern para interfaces funcionais suportadas
+    // Build pattern for supported functional interfaces
     const interfacePattern = LambdaRule.FUNCTIONAL_INTERFACES.join('|');
     
-    // Padrão mais robusto para detectar:
+    // More robust pattern to detect:
     // 1. new InterfaceName<GenericParams>()
-    // 2. { sobrescrita de método com possível @Override }
-    // 3. Suporta comentários e formatação variada
+    // 2. { method override with possible @Override }
+    // 3. Supports comments and varied formatting
     return new RegExp(
       // Interface name with optional generic parameters
       `new\\s+(${interfacePattern})(?:<[^>]*>)?\\s*\\(\\)\\s*\\{\\s*` +
@@ -85,33 +85,33 @@ export class LambdaRule extends AbstractModernizationRule {
     const pattern = this.getAnonymousClassPattern();
     
     return text.replace(pattern, (match, _interfaceName, _methodName, parameters, body) => {
-      // Remover comentários, espaços em branco extras e quebras de linha do corpo
+      // Remove comments, extra whitespace and line breaks from the body
       const cleanBody = body.trim()
-        .replace(/\/\/[^\n]*/g, '') // Remover comentários de linha
-        .replace(/\/\*[\s\S]*?\*\//g, '') // Remover comentários de bloco
+        .replace(/\/\/[^\n]*/g, '') // Remove line comments
+        .replace(/\/\*[\s\S]*?\*\//g, '') // Remove block comments
         .trim();
       
-      // Verificar se o corpo termina com return ou se é um corpo simples
+      // Check if the body ends with return or is a simple body
       const hasReturn = cleanBody.match(/return\s+([^;]+);$/);
       
-      // Processar parâmetros
+      // Process parameters
       let paramList = parameters
         .split(',')
         .map((p: string) => p.trim())
         .filter((p: string | any[]) => p.length > 0)
         .map((p: string) => {
-          // Extrair apenas o nome do parâmetro (sem tipo)
+          // Extract just the parameter name (without type)
           const parts = p.split(/\s+/);
           return parts[parts.length - 1];
         })
         .join(", ");
       
-      // Se não tiver parâmetros, usar ()
+      // If no parameters, use ()
       if (paramList.length === 0) {
         paramList = "()";
       } else if (!parameters.includes(",")) {
-        // Se tiver apenas um parâmetro, remover parênteses
-        // Exceto se tiver anotações ou tipo
+        // If only one parameter, remove parentheses
+        // Except if it has annotations or type
         if (!parameters.includes("@") && parameters.split(/\s+/).length <= 2) {
           paramList = paramList.trim();
         } else {
@@ -121,21 +121,37 @@ export class LambdaRule extends AbstractModernizationRule {
         paramList = `(${paramList})`;
       }
       
-      // Construir a expressão lambda
+      // Build the lambda expression
       let lambdaExpression;
       
+      // Count number of statements
+      const statementCount = cleanBody.split(';')
+        .filter((line: { trim: () => { (): any; new(): any; length: number; }; }) => line.trim().length > 0)
+        .length;
+      
       if (hasReturn) {
-        // Se o corpo tiver apenas um return, simplificar para uma expressão
+        // If the body has just a return, simplify to an expression
         lambdaExpression = `${paramList} -> ${hasReturn[1]}`;
-      } else if (cleanBody.split(';').filter((line: { trim: () => { (): any; new(): any; length: number; }; }) => line.trim().length > 0).length === 1) {
-        // Se o corpo tiver apenas uma instrução, simplificar
+      } else if (statementCount <= 1) {
+        // If the body has only one statement, simplify
         lambdaExpression = `${paramList} -> ${cleanBody.replace(/;$/, '')}`;
       } else {
-        // Caso contrário, manter o corpo completo
-        lambdaExpression = `${paramList} -> {\n  ${cleanBody}\n}`;
+        // Otherwise, keep the full body with proper indentation
+        const formattedBody = cleanBody
+          .split('\n')
+          .map((line: string) => line.trim())
+          .filter((line: string | any[]) => line.length > 0)
+          .join('\n  ');
+          
+        lambdaExpression = `${paramList} -> {\n  ${formattedBody}\n}`;
       }
       
-      // Obter o prefixo (tudo antes de "new Interface()...")
+      // Add semicolon if needed
+      if (!lambdaExpression.endsWith(';') && !lambdaExpression.endsWith('}')) {
+        lambdaExpression += ';';
+      }
+      
+      // Get the prefix (everything before "new Interface()...")
       const prefixMatch = match.match(/^(.*?)new\s+/);
       const prefix = prefixMatch ? prefixMatch[1] : '';
       

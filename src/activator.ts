@@ -1,10 +1,10 @@
 import * as vscode from "vscode";
 import { Java8Rules } from "./modernization/versions/java8/java8Rules";
 // import { Java9Rules } from './modernization/versions/java9/Java9Rules';
-// import { Java11Rules } from './modernization/versions/java11/Java11Rules';
+import { Java11Rules } from './modernization/versions/java11/java11Rules';
 // import { Java15Rules } from './modernization/versions/java15/Java15Rules';
-// import { Java17Rules } from './modernization/versions/java17/Java17Rules';
-// import { Java21Rules } from './modernization/versions/java21/Java21Rules';
+import { Java17Rules } from './modernization/versions/java17/java17Rules';
+import { Java21Rules } from './modernization/versions/java21/java21Rules';
 import { PatternAnalyzer } from "./analyzer/patternAnalyzer";
 import { RefactoringProvider } from "./refactor/refactoringProvider";
 import { ModernizationCodeActionProvider } from "./refactor/codeActions";
@@ -64,10 +64,10 @@ export class Activator {
     // Registrar regras para cada versão do Java
     Java8Rules.register();
     // Java9Rules.register();
-    // Java11Rules.register();
+     Java11Rules.register();
     // Java15Rules.register();
-    // Java17Rules.register();
-    // Java21Rules.register();
+     Java17Rules.register();
+     Java21Rules.register();
   }
 
   /**

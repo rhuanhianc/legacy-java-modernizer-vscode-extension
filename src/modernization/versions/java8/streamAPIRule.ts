@@ -3,7 +3,7 @@ import { AbstractModernizationRule } from '../../core/abstractModernizationRule'
 import { RuleComplexity } from '../../core/modernizationRule';
 
 /**
- * Regra para converter loops for-each para operações de Stream API
+ * Rule to convert for-each loops to Stream API operations
  */
 export class StreamAPIRule extends AbstractModernizationRule {
   constructor() {
@@ -27,24 +27,24 @@ export class StreamAPIRule extends AbstractModernizationRule {
   }
 
   /**
-   * Padrão para detectar loops for-each
+   * Pattern to detect for-each loops
    */
   private getForEachPattern(): RegExp {
     return /for\s*\(\s*([\w.<>]+)\s+(\w+)\s*:\s*(\w+(?:\.\w+\(\))?)\s*\)\s*\{([^}]*)\}/gs;
   }
 
   /**
-   * Padrão para detectar filtros dentro de for-each
+   * Pattern to detect filters in for-each loops
    */
   private getFilterPattern(itemVar: string): RegExp {
     return new RegExp(`if\\s*\\(\\s*${itemVar}\\s*\\.([^)]+)\\)\\s*\\{([^}]*)\\}`, 'g');
   }
 
   /**
-   * Padrão para detectar transformações dentro de for-each
+   * Pattern to detect transformations in for-each loops
    */
   private getMapPattern(itemVar: string): RegExp {
-    // Por exemplo: String upperCase = item.toUpperCase();
+    // Example: String upperCase = item.toUpperCase();
     return new RegExp(`(\\w+)\\s+(\\w+)\\s*=\\s*${itemVar}\\s*\\.([^;]+);`, 'g');
   }
 
@@ -57,14 +57,14 @@ export class StreamAPIRule extends AbstractModernizationRule {
   async analyzeDocument(document: vscode.TextDocument): Promise<vscode.Range[]> {
     const matches = this.findAllMatches(document, this.getForEachPattern());
     
-    // Filtrar para incluir apenas loops for-each que podem ser convertidos
+    // Filter to include only for-each loops that can be converted
     const validMatches = matches.filter(m => {
       const text = document.getText(m.range);
       
-      // Extrair informações do loop
+      // Extract loop information
       const [_, itemType, itemVar, collection, body] = m.match;
       
-      // Verificar se o corpo do loop é adequado para conversão
+      // Check if the loop body is suitable for conversion
       return this.isBodyConvertible(body, itemVar);
     });
     
@@ -72,12 +72,12 @@ export class StreamAPIRule extends AbstractModernizationRule {
   }
 
   /**
-   * Verifica se o corpo do loop pode ser convertido para Stream API
-   * @param body Corpo do loop
-   * @param itemVar Nome da variável de item
+   * Checks if the loop body can be converted to Stream API
+   * @param body Loop body
+   * @param itemVar Item variable name
    */
   private isBodyConvertible(body: string, itemVar: string): boolean {
-    // Casos simples que são bons candidatos para conversão:
+    // Simple cases that are good candidates for conversion:
     
     // 1. System.out.println(item) => forEach(System.out::println)
     if (body.includes(`System.out.println(${itemVar})`) || 
@@ -103,7 +103,7 @@ export class StreamAPIRule extends AbstractModernizationRule {
       return true;
     }
     
-    // Casos mais complexos podem não ser bons para conversão automática
+    // More complex cases may not be good for automatic conversion
     return false;
   }
 
@@ -112,30 +112,30 @@ export class StreamAPIRule extends AbstractModernizationRule {
     const pattern = this.getForEachPattern();
     
     return text.replace(pattern, (_match, itemType, itemVar, collection, body) => {
-      // Analisar o corpo do loop para determinar as operações de stream
+      // Analyze the loop body to determine stream operations
       const operations: string[] = [];
       
-      // Verificar filtros (if statements)
+      // Check for filters (if statements)
       const filterPattern = this.getFilterPattern(itemVar);
       let filteredBody = body;
       let filterMatch;
       
       while ((filterMatch = filterPattern.exec(body)) !== null) {
         const condition = filterMatch[1].trim();
-        // Adicionar operação de filter
+        // Add filter operation
         operations.push(`.filter(${itemVar} -> ${itemVar}.${condition})`);
         
-        // Remover o if do corpo para processamento adicional
+        // Remove the if from the body for additional processing
         filteredBody = filteredBody.replace(filterMatch[0], filterMatch[2]);
       }
       
-      // Verificar transformações (atribuições)
+      // Check for transformations (assignments)
       const mapPattern = this.getMapPattern(itemVar);
       let mapMatch;
       
       while ((mapMatch = mapPattern.exec(filteredBody)) !== null) {
         const transformation = mapMatch[3].trim();
-        // Verificar se podemos usar referência de método
+        // Check if we can use a method reference
         if (transformation.endsWith(')') && !transformation.includes('(', transformation.indexOf('(')+1)) {
           const methodName = transformation.substring(0, transformation.indexOf('('));
           operations.push(`.map(${itemType}::${methodName})`);
@@ -144,14 +144,14 @@ export class StreamAPIRule extends AbstractModernizationRule {
         }
       }
       
-      // Verificar forEach (System.out.println)
+      // Check for forEach (System.out.println)
       if (filteredBody.includes(`System.out.println(${itemVar})`) || 
           filteredBody.includes(`System.out.println(${itemVar}.`)) {
         
         if (filteredBody.includes(`System.out.println(${itemVar})`)) {
           operations.push('.forEach(System.out::println)');
         } else {
-          // Extrair a parte após System.out.println(item.
+          // Extract the part after System.out.println(item.
           const printPattern = new RegExp(`System\\.out\\.println\\(${itemVar}\\.(.*?)\\)`, 'g');
           let printMatch;
           
@@ -160,8 +160,8 @@ export class StreamAPIRule extends AbstractModernizationRule {
             if (operations.some(op => op.includes('.map('))) {
               operations.push('.forEach(System.out::println)');
             } else {
-              operations.push(`.map(${itemVar} -> ${itemVar}.${printTransformation})`)
-                         operations.push('.forEach(System.out::println)');
+              operations.push(`.map(${itemVar} -> ${itemVar}.${printTransformation})`);
+              operations.push('.forEach(System.out::println)');
             }
           } else {
             operations.push('.forEach(System.out::println)');
@@ -169,7 +169,7 @@ export class StreamAPIRule extends AbstractModernizationRule {
         }
       }
       
-      // Verificar collect (result.add)
+      // Check for collect (result.add)
       if (filteredBody.includes(`.add(${itemVar})`) || 
           filteredBody.includes(`.add(${itemVar}.`)) {
         
@@ -188,19 +188,23 @@ export class StreamAPIRule extends AbstractModernizationRule {
           
           operations.push('.collect(Collectors.toList())');
           
-          // Adicionar uma nota sobre a importação necessária
-          return `// Importe: import java.util.stream.Collectors;\n${collection}.stream()\n  ${operations.join('\n  ')}`;
+          // Add a note about the required import
+          return `// Importe: import java.util.stream.Collectors;\n${collection}.stream()\n  ${operations.join('\n  ')};`;
         }
       }
       
-      // Se não detectamos uma operação terminal, adicionar collect como padrão
+      // If we didn't detect a terminal operation, add collect as default
       if (!operations.some(op => op.includes('.forEach(') || op.includes('.collect('))) {
         operations.push('.collect(Collectors.toList())');
-        return `// Importe: import java.util.stream.Collectors;\n${collection}.stream()\n  ${operations.join('\n  ')}`;
+        return `// Importe: import java.util.stream.Collectors;\n${collection}.stream()\n  ${operations.join('\n  ')};`;
       }
       
-      // Construir a expressão de stream
-      return `${collection}.stream()\n  ${operations.join('\n  ')}`;
+      // Build the stream expression, ensuring it ends with a semicolon
+      let result = `${collection}.stream()\n  ${operations.join('\n  ')}`;
+      if (!result.endsWith(';')) {
+        result += ';';
+      }
+      return result;
     });
   }
 }
