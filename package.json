@@ -1,0 +1,294 @@
+{
+    "name": "legacy-java-modernizer",
+    "displayName": "Legacy Java Modernizer",
+    "description": "Modernize seu código Java legado para versões mais recentes do Java",
+    "version": "0.2.0",
+    "engines": {
+        "vscode": "^1.80.0"
+    },
+    "publisher": "seu-publisher-id",
+    "categories": [
+        "Programming Languages",
+        "Formatters",
+        "Linters",
+        "Other"
+    ],
+    "activationEvents": [
+        "onLanguage:java",
+        "onView:javaModernizerSidebar"
+    ],
+    "main": "./out/extension.js",
+    "contributes": {
+        "commands": [
+            {
+                "command": "legacyJavaModernizer.analyzeWorkspace",
+                "title": "Analisar Workspace Java",
+                "category": "Legacy Java Modernizer",
+                "icon": "$(search)"
+            },
+            {
+                "command": "legacyJavaModernizer.showDashboard",
+                "title": "Mostrar Dashboard de Modernização",
+                "category": "Legacy Java Modernizer",
+                "icon": "$(graph)"
+            },
+            {
+                "command": "legacyJavaModernizer.excludeFromModernization",
+                "title": "Excluir da Modernização",
+                "category": "Legacy Java Modernizer",
+                "icon": "$(exclude)"
+            },
+            {
+                "command": "legacyJavaModernizer.includeInModernization",
+                "title": "Incluir na Modernização",
+                "category": "Legacy Java Modernizer",
+                "icon": "$(add)"
+            },
+            {
+                "command": "legacyJavaModernizer.applyAllSuggestions",
+                "title": "Aplicar Todas as Sugestões",
+                "category": "Legacy Java Modernizer",
+                "icon": "$(check-all)"
+            },
+            {
+                "command": "legacyJavaModernizer.refreshSidebar",
+                "title": "Atualizar",
+                "category": "Legacy Java Modernizer",
+                "icon": "$(refresh)"
+            },
+            {
+                "command": "legacyJavaModernizer.showSidebar",
+                "title": "Mostrar Painel de Modernização Java",
+                "category": "Legacy Java Modernizer",
+                "icon": "$(panel-view)"
+            },
+            {
+                "command": "legacyJavaModernizer.changeTargetVersion",
+                "title": "Mudar Versão Alvo do Java",
+                "category": "Legacy Java Modernizer",
+                "icon": "$(versions)"
+            },
+            {
+                "command": "legacyJavaModernizer.showMetrics",
+                "title": "Mostrar Métricas Detalhadas",
+                "category": "Legacy Java Modernizer",
+                "icon": "$(dashboard)"
+            }
+        ],
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "legacy-java-modernizer",
+                    "title": "Legacy Java Modernizer",
+                    "icon": "resources/icon.svg"
+                }
+            ]
+        },
+        "views": {
+            "legacy-java-modernizer": [
+                {
+                    "id": "javaModernizerExplorer",
+                    "name": "Explorador",
+                    "when": "config.legacyJavaModernizer.showExplorerView"
+                },
+                {
+                    "id": "javaModernizerStatistics",
+                    "name": "Estatísticas",
+                    "when": "config.legacyJavaModernizer.showStatisticsView"
+                },
+                {
+                    "id": "javaModernizerVersions",
+                    "name": "Versões",
+                    "when": "config.legacyJavaModernizer.showVersionsView"
+                },
+                {
+                    "id": "javaModernizerMonitoring",
+                    "name": "Monitoramento",
+                    "when": "config.legacyJavaModernizer.showMonitoringView"
+                }
+            ]
+        },
+        "viewsWelcome": [
+            {
+                "view": "javaModernizerExplorer",
+                "contents": "Bem-vindo ao Legacy Java Modernizer! Analise seu código Java para encontrar oportunidades de modernização.\n[Analisar Workspace](command:legacyJavaModernizer.analyzeWorkspace)\nOu [abrir o Dashboard](command:legacyJavaModernizer.showDashboard) para ver as estatísticas."
+            },
+            {
+                "view": "javaModernizerVersions",
+                "contents": "Selecione sua versão alvo do Java para modernização.\n[Mudar Versão Alvo](command:legacyJavaModernizer.changeTargetVersion)"
+            }
+        ],
+        "menus": {
+            "view/title": [
+                {
+                    "command": "legacyJavaModernizer.analyzeWorkspace",
+                    "when": "view == javaModernizerExplorer",
+                    "group": "navigation"
+                },
+                {
+                    "command": "legacyJavaModernizer.refreshSidebar",
+                    "when": "view == javaModernizerExplorer || view == javaModernizerStatistics || view == javaModernizerVersions || view == javaModernizerMonitoring",
+                    "group": "navigation"
+                },
+                {
+                    "command": "legacyJavaModernizer.showDashboard",
+                    "when": "view == javaModernizerStatistics",
+                    "group": "navigation"
+                },
+                {
+                    "command": "legacyJavaModernizer.changeTargetVersion",
+                    "when": "view == javaModernizerVersions",
+                    "group": "navigation"
+                },
+                {
+                    "command": "legacyJavaModernizer.showMetrics",
+                    "when": "view == javaModernizerMonitoring",
+                    "group": "navigation"
+                }
+            ],
+            "editor/context": [
+                {
+                    "command": "legacyJavaModernizer.excludeFromModernization",
+                    "when": "resourceLangId == java",
+                    "group": "legacyJavaModernizer"
+                },
+                {
+                    "command": "legacyJavaModernizer.includeInModernization",
+                    "when": "resourceLangId == java",
+                    "group": "legacyJavaModernizer"
+                }
+            ],
+            "commandPalette": [
+                {
+                    "command": "legacyJavaModernizer.showSidebar",
+                    "group": "legacyJavaModernizer"
+                },
+                {
+                    "command": "legacyJavaModernizer.changeTargetVersion",
+                    "group": "legacyJavaModernizer"
+                }
+            ]
+        },
+        "configuration": {
+            "title": "Legacy Java Modernizer",
+            "properties": {
+                "legacyJavaModernizer.targetJavaVersion": {
+                    "type": "string",
+                    "enum": [
+                        "8",
+                        "9",
+                        "11",
+                        "15",
+                        "17",
+                        "21"
+                    ],
+                    "default": "11",
+                    "description": "Versão alvo do Java para modernização"
+                },
+                "legacyJavaModernizer.enableAutomaticSuggestions": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Habilita sugestões automáticas de modernização durante a edição"
+                },
+                "legacyJavaModernizer.excludedFolders": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "default": [],
+                    "description": "Pastas a serem excluídas da modernização"
+                },
+                "legacyJavaModernizer.excludedFiles": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "default": [],
+                    "description": "Arquivos a serem excluídos da modernização"
+                },
+                "legacyJavaModernizer.customPatterns": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "name": {
+                                "type": "string",
+                                "description": "Nome do padrão personalizado"
+                            },
+                            "pattern": {
+                                "type": "string",
+                                "description": "Padrão regex para identificação"
+                            },
+                            "replacement": {
+                                "type": "string",
+                                "description": "Código de substituição"
+                            },
+                            "description": {
+                                "type": "string",
+                                "description": "Descrição do padrão"
+                            }
+                        }
+                    },
+                    "default": [],
+                    "description": "Padrões personalizados para detecção e modernização"
+                },
+                "legacyJavaModernizer.showExplorerView": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Mostra a visualização do Explorador no painel lateral"
+                },
+                "legacyJavaModernizer.showStatisticsView": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Mostra a visualização de Estatísticas no painel lateral"
+                },
+                "legacyJavaModernizer.showVersionsView": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Mostra a visualização de Versões no painel lateral"
+                },
+                "legacyJavaModernizer.showMonitoringView": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Mostra a visualização de Monitoramento no painel lateral"
+                },
+                "legacyJavaModernizer.modernizationMetricsEnabled": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Habilita o cálculo e exibição de métricas de modernização"
+                },
+                "legacyJavaModernizer.enabledRules": {
+                    "type": "object",
+                    "default": {},
+                    "description": "Regras habilitadas por versão do Java"
+                }
+            }
+        }
+    },
+    "scripts": {
+        "vscode:prepublish": "npm run webpack-prod",
+        "webpack": "webpack --mode development",
+        "webpack-dev": "webpack --mode development --watch",
+        "webpack-prod": "webpack --mode production",
+        "compile": "tsc -p ./",
+        "watch": "tsc -watch -p ./",
+        "lint": "eslint src --ext ts",
+        "package": "vsce package",
+        "test": "jest"
+    },
+    "devDependencies": {
+        "@types/jest": "^29.5.11",
+        "@types/node": "16.x",
+        "@types/vscode": "^1.80.0",
+        "ts-jest": "^29.1.1",
+        "ts-loader": "^9.4.3",
+        "typescript": "^5.1.6",
+        "webpack": "^5.88.1",
+        "webpack-cli": "^5.1.4"
+    },
+    "dependencies": {
+        "chart.js": "^3.9.1",
+        "java-ast": "^0.3.0",
+        "jscodeshift": "^0.15.0"
+    }
+}

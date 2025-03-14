@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Modernização Java</title>
+    <link rel="stylesheet" href="{{cssPath}}">
+    <script src="{{chartJsPath}}"></script>
+</head>
+<body>
+    <div class="dashboard-container">
+        <header class="dashboard-header">
+            <h1>Dashboard de Modernização Java</h1>
+            <div class="actions">
+                <button id="refreshButton" class="action-button">Atualizar Análise</button>
+                <button id="applyAllButton" class="action-button action-primary">Aplicar Todas as Sugestões</button>
+            </div>
+        </header>
+
+        <div class="summary-cards">
+            <div class="card">
+                <div class="card-title">Arquivos</div>
+                <div class="card-content">
+                    <div class="stat-circle">
+                        <div class="stat-number" id="totalFiles">0</div>
+                    </div>
+                    <div class="stat-details">
+                        <div class="stat-item">
+                            <span class="stat-label">Com padrões:</span>
+                            <span class="stat-value" id="filesWithPatterns">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Modernizados:</span>
+                            <span class="stat-value" id="filesModernized">0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-title">Padrões</div>
+                <div class="card-content">
+                    <div class="stat-circle">
+                        <div class="stat-number" id="totalPatterns">0</div>
+                    </div>
+                    <div class="stat-details">
+                        <div class="stat-item">
+                            <span class="stat-label">Sugeridos:</span>
+                            <span class="stat-value" id="suggestedPatterns">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Aplicados:</span>
+                            <span class="stat-value" id="appliedPatterns">0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-title">Impacto Estimado</div>
+                <div class="card-content impact-content">
+                    <div class="impact-meters">
+                        <div class="impact-meter">
+                            <label>Legibilidade</label>
+                            <progress id="readabilityMeter" max="10" value="0"></progress>
+                            <span id="readabilityValue">0/10</span>
+                        </div>
+                        <div class="impact-meter">
+                            <label>Performance</label>
+                            <progress id="performanceMeter" max="10" value="0"></progress>
+                            <span id="performanceValue">0/10</span>
+                        </div>
+                        <div class="impact-meter">
+                            <label>Manutenibilidade</label>
+                            <progress id="maintenanceMeter" max="10" value="0"></progress>
+                            <span id="maintenanceValue">0/10</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="charts-container">
+            <div class="chart-card">
+                <h2>Padrões por Tipo</h2>
+                <div class="chart-container">
+                    <canvas id="patternsChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="chart-card">
+                <h2>Arquivos com Mais Padrões</h2>
+                <div class="chart-container">
+                    <canvas id="filesChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="details-section">
+            <h2>Detalhes dos Padrões</h2>
+            <div class="filter-container">
+                <input type="text" id="patternFilter" placeholder="Filtrar padrões...">
+                <select id="versionFilter">
+                    <option value="all">Todas as Versões</option>
+                    <option value="8">Java 8</option>
+                    <option value="11">Java 11</option>
+                    <option value="17">Java 17</option>
+                    <option value="21">Java 21</option>
+                </select>
+            </div>
+            <table class="patterns-table">
+                <thead>
+                    <tr>
+                        <th>Nome do Padrão</th>
+                        <th>Descrição</th>
+                        <th>Ocorrências</th>
+                        <th>Versão Java</th>
+                        <th>Complexidade</th>
+                    </tr>
+                </thead>
+                <tbody id="patternsTableBody">
+                    <!-- Conteúdo preenchido via JavaScript -->
+                </tbody>
+            </table>
+        </div>
+
+        <div class="details-section">
+            <h2>Arquivos com Padrões</h2>
+            <div class="filter-container">
+                <input type="text" id="fileFilter" placeholder="Filtrar arquivos...">
+            </div>
+            <table class="files-table">
+                <thead>
+                    <tr>
+                        <th>Arquivo</th>
+                        <th>Padrões Encontrados</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="filesTableBody">
+                    <!-- Conteúdo preenchido via JavaScript -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // Dados de análise injetados pelo servidor
+        const analysisData = {{analysisData}};
+    </script>
+    <script src="{{jsPath}}"></script>
+</body>
+</html>

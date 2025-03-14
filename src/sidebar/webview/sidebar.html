@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Legacy Java Modernizer</title>
+    <link rel="stylesheet" href="{{cssPath}}">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>Legacy Java Modernizer</h1>
+        </header>
+
+        <section class="version-section">
+            <h2>Versão Alvo</h2>
+            <div class="version-selector">
+                <div class="version-label">Seu Código será Modernizado para:</div>
+                <div class="version-tag" id="currentVersion">Java {{targetVersion}}</div>
+                <div class="version-info">
+                    <p>As regras de modernização disponíveis dependem da versão alvo do Java.</p>
+                    <ul class="version-features-list" id="versionFeaturesList">
+                        <!-- Preenchido dinamicamente com JavaScript -->
+                    </ul>
+                </div>
+                <button class="change-version-btn" id="changeVersionBtn">Mudar Versão</button>
+            </div>
+        </section>
+
+        <section class="analysis-section" id="analysisSection">
+            <h2>Análise do Workspace</h2>
+            <div class="analysis-placeholder" id="analysisPlaceholder">
+                <p>Nenhuma análise realizada ainda.</p>
+                <button class="action-button" id="analyzeBtn">Analisar Workspace</button>
+            </div>
+            <div class="analysis-results" id="analysisResults" style="display: none;">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-title">Arquivos Analisados</div>
+                        <div class="stat-value" id="analyzedFiles">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-title">Padrões Encontrados</div>
+                        <div class="stat-value" id="patternsFound">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-title">Arquivos com Padrões</div>
+                        <div class="stat-value" id="filesWithPatterns">0</div>
+                    </div>
+                </div>
+                <div class="progress-container">
+                    <div class="progress-label">Modernização</div>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar" id="modernizationProgress"></div>
+                    </div>
+                    <div class="progress-value" id="modernizationProgressValue">0%</div>
+                </div>
+                <button class="action-button" id="showDashboardBtn">Abrir Dashboard</button>
+                <button class="action-button" id="applyAllBtn">Aplicar Todas Sugestões</button>
+            </div>
+        </section>
+
+        <section class="features-section">
+            <h2>Modernizações por Versão</h2>
+            <div class="version-features">
+                <div class="version-feature-item">
+                    <div class="version-badge">Java 8</div>
+                    <ul class="feature-list">
+                        <li>Lambdas</li>
+                        <li>Stream API</li>
+                        <li>Optional</li>
+                    </ul>
+                </div>
+                <div class="version-feature-item">
+                    <div class="version-badge">Java 9</div>
+                    <ul class="feature-list">
+                        <li>Try-with-resources</li>
+                        <li>Operador diamante</li>
+                    </ul>
+                </div>
+                <div class="version-feature-item">
+                    <div class="version-badge">Java 11</div>
+                    <ul class="feature-list">
+                        <li>Palavra-chave var</li>
+                        <li>Métodos de String</li>
+                    </ul>
+                </div>
+                <div class="version-feature-item">
+                    <div class="version-badge">Java 15</div>
+                    <ul class="feature-list">
+                        <li>Blocos de texto</li>
+                    </ul>
+                </div>
+                <div class="version-feature-item">
+                    <div class="version-badge">Java 17</div>
+                    <ul class="feature-list">
+                        <li>Expressões switch</li>
+                        <li>Classes seladas</li>
+                    </ul>
+                </div>
+                <div class="version-feature-item">
+                    <div class="version-badge">Java 21</div>
+                    <ul class="feature-list">
+                        <li>Pattern matching</li>
+                        <li>Records</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <section class="recent-files-section" id="recentFilesSection" style="display: none;">
+            <h2>Arquivos com Padrões</h2>
+            <div class="recent-files-list" id="recentFilesList">
+                <!-- Preenchido via JavaScript -->
+            </div>
+        </section>
+
+        <section class="metrics-section" id="metricsSection" style="display: none;">
+            <h2>Métricas de Impacto</h2>
+            <div class="metrics-container">
+                <div class="metric-item">
+                    <div class="metric-label">Legibilidade</div>
+                    <div class="meter-container">
+                        <div class="meter" id="readabilityMeter"></div>
+                    </div>
+                    <div class="metric-value" id="readabilityValue">0/10</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Performance</div>
+                    <div class="meter-container">
+                        <div class="meter" id="performanceMeter"></div>
+                    </div>
+                    <div class="metric-value" id="performanceValue">0/10</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Manutenibilidade</div>
+                    <div class="meter-container">
+                        <div class="meter" id="maintenanceMeter"></div>
+                    </div>
+                    <div class="metric-value" id="maintenanceValue">0/10</div>
+                </div>
+            </div>
+            <button class="action-button" id="showMetricsBtn">Ver Métricas Detalhadas</button>
+        </section>
+    </div>
+
+    <script>
+        // Dados iniciais
+        const targetVersion = "{{targetVersion}}";
+        const supportedVersions = {{supportedVersions}};
+    </script>
+    <script src="{{jsPath}}"></script>
+</body>
+</html>
